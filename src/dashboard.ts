@@ -25,6 +25,21 @@ const SIM_LOG      = path.join(ROOT, 'logs/simulation.json');
 const MODEL_STATS  = path.join(ROOT, 'scripts/model_stats.json');
 const RETRAIN_STATE = path.join(ROOT, 'logs/retrain-state.json');
 
+// ── Price history cache (30s TTL — avoids 3s RPC call on every refresh) ──────
+const priceCache = new Map<string, { data: unknown[]; ts: number }>();
+async function getCachedPriceHistory(oracleId: string) {
+  const cached = priceCache.get(oracleId);
+  if (cached && Date.now() - cached.ts < 30_000) return cached.data;
+  const fresh = await getPriceHistory(oracleId);
+  priceCache.set(oracleId, { data: fresh, ts: Date.now() });
+  // Clear old entries
+  if (priceCache.size > 5) {
+    const oldest = [...priceCache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
+    priceCache.delete(oldest[0]);
+  }
+  return fresh;
+}
+
 // ── Data helpers ──────────────────────────────────────────────────────────────
 
 function readCycles(n = 20) {
@@ -70,7 +85,7 @@ app.get('/api/market', async (_req: Request, res: Response) => {
     if (!oracle) { res.json({ oracle: null }); return; }
     const [price, prices, active] = await Promise.all([
       getLatestPrice(oracle.oracle_id),
-      getPriceHistory(oracle.oracle_id),
+      getCachedPriceHistory(oracle.oracle_id),
       getFutureOracles(),
     ]);
     const features = computeFeatures(oracle, prices, price);
@@ -659,7 +674,7 @@ async function loadAll(){
 }
 
 loadAll();
-setInterval(loadAll,30000);
+setInterval(loadAll,60000);
 </script>
 </body>
 </html>`;
