@@ -62,6 +62,11 @@ export interface ManagerPosition {
   [key: string]: unknown;
 }
 
+export interface ManagerPositions {
+  minted:   ManagerPosition[];
+  redeemed: ManagerPosition[];
+}
+
 export interface ManagerRecord {
   manager_id: string;
   owner:      string;
@@ -102,8 +107,8 @@ export const getManagers = (): Promise<ManagerRecord[]> =>
 export const getManagerSummary = (managerId: string): Promise<ManagerSummary> =>
   get<ManagerSummary>(`/managers/${managerId}/summary`);
 
-export const getManagerPositions = (managerId: string): Promise<ManagerPosition[]> =>
-  get<ManagerPosition[]>(`/managers/${managerId}/positions`);
+export const getManagerPositions = (managerId: string): Promise<ManagerPositions> =>
+  get<ManagerPositions>(`/managers/${managerId}/positions`);
 
 /** Find a manager by owner address (returns null if none created yet). */
 export const getManagerByOwner = async (ownerAddress: string): Promise<ManagerRecord | null> => {

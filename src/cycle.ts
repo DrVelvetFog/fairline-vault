@@ -12,6 +12,7 @@
 import 'dotenv/config';
 import {
   getNearestActiveOracle, getPriceHistory, getLatestPrice, getManagerSummary,
+  getManagerPositions, ManagerPosition,
 } from './indexer.js';
 import { computeFeatures } from './features.js';
 import { decide, ping, AllocationDecision, CycleContext } from './model.js';
@@ -156,6 +157,15 @@ export async function runCycle(): Promise<void> {
 
   const minsLeft = (oracle.expiry - Date.now()) / 60_000;
   console.log(`Oracle: ${oracle.oracle_id.slice(0, 12)}… expiry in ${minsLeft.toFixed(1)} min`);
+
+  // Guard: skip if we already have an open position in this oracle
+  const existingPositions = await getManagerPositions(MANAGER_ID);
+  const alreadyEntered = existingPositions.minted.some(p => p.oracle_id === oracle.oracle_id);
+  if (alreadyEntered) {
+    console.log(`Already entered oracle ${oracle.oracle_id.slice(0, 12)}… — waiting for settlement.`);
+    console.log('━━━ done (idle) ━━━\n');
+    return;
+  }
 
   const [prices, latest, summary, dusdcBal] = await Promise.all([
     getPriceHistory(oracle.oracle_id),

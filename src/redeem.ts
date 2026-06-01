@@ -24,15 +24,15 @@ async function main() {
     return;
   }
 
-  const positions = await getManagerPositions(MANAGER_ID);
-  console.log(`\nPositions found: ${positions.length}`);
+  const { minted } = await getManagerPositions(MANAGER_ID);
+  console.log(`\nOpen positions: ${minted.length}`);
 
   // Cross-reference against settled oracles
   const settled = await getSettledOracles();
   const settledIds = new Set(settled.map(o => o.oracle_id));
 
   let redeemed = 0;
-  for (const pos of positions) {
+  for (const pos of minted) {
     if (!settledIds.has(pos.oracle_id)) {
       console.log(`  ${pos.oracle_id.slice(0,12)}… not yet settled — skip`);
       continue;

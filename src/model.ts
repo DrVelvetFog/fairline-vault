@@ -61,6 +61,18 @@ ALLOCATION CONSTRAINTS:
 - Skip the cycle if time_to_expiry < 3 minutes (too late to enter safely)
 - Skip if balance < 2.0 dUSDC
 
+WHEN TO USE EACH ALLOCATION TYPE:
+- supply_usdc > 0  : when vol is HIGH (>10%) or trend is FLAT — earn the spread as counterparty instead of taking direction
+- mint UP/DOWN     : when vol is LOW-MODERATE (<10%) and trend is clear — directional conviction play
+- mint RANGE       : when vol is MODERATE and price has been ranging — bet on BTC staying within a $10 band
+- Mix supply + position is valid — e.g. supply 5 dUSDC for passive yield while minting 3 dUSDC directional
+
+GUIDANCE:
+- Flat trend + any vol → prefer supply over skipping (earn spread passively)
+- Vol > 10% → lean toward supply (wider spread = more LP income)
+- Vol < 5% + clear trend → directional mint
+- Vol 5-10% + trend → split: some supply, some direction
+
 OUTPUT: Return ONLY valid JSON, no other text. Schema:
 {
   "reasoning": "one clear sentence explaining the decision",

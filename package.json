@@ -8,6 +8,7 @@
     "market": "tsx src/market.ts",
     "setup": "tsx src/setup.ts",
     "dashboard": "tsx src/dashboard.ts",
+    "watcher": "tsx src/watcher.ts",
     "first-trade": "tsx src/first-trade.ts",
     "redeem": "tsx src/redeem.ts",
     "cycle": "tsx src/cycle.ts",
