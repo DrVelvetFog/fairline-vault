@@ -278,5 +278,43 @@
     "executed": false,
     "tx_digests": [],
     "sim_only": true
+  },
+  {
+    "ts": "2026-06-01T19:22:06.096Z",
+    "oracle_id": "0x8d282eb9bd1e229c0a793ba6ac55f9d11b64a3f89c268bd87a773c60436b53a6",
+    "expiry": "2026-06-01T19:30:00.000Z",
+    "spot_usd": 71380.159823484,
+    "features": {
+      "oracle_id": "0x8d282eb9bd1e229c0a793ba6ac55f9d11b64a3f89c268bd87a773c60436b53a6",
+      "underlying": "BTC",
+      "expiry_ms": 1780342200000,
+      "spot_usd": 71380.159823484,
+      "forward_usd": 71379.616379941,
+      "min_strike_usd": 50000,
+      "tick_usd": 1,
+      "time_to_expiry_min": 7.876633333333333,
+      "hour_utc": 19,
+      "day_of_week": 0,
+      "realized_vol_pct": 4.84,
+      "price_trend": "flat",
+      "price_change_pct": 0.0105,
+      "momentum_pct": -0.0009,
+      "range_pct": 0.0225,
+      "basis_bps": -0.1,
+      "price_high_usd": 71374.37,
+      "price_low_usd": 71358.31,
+      "n_prices": 20
+    },
+    "decision": {
+      "reasoning": "The ML model is highly confident BTC will be above its current price at the next expiry, and realized volatility is low. With a flat trend and only 7.9 minutes until expiry, I'm going to skip this cycle entirely.",
+      "supply_usdc": 0,
+      "positions": [],
+      "confidence": "high",
+      "skip": true,
+      "skip_reason": "time_to_expiry < 3 minutes"
+    },
+    "executed": false,
+    "tx_digests": [],
+    "sim_only": false
   }
 ]

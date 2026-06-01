@@ -74,6 +74,13 @@ npm run dashboard
 
 **Live execution** — set `LIVE_MODE=true` in `.env` and ensure dUSDC is in your wallet (request via the [Mysten Labs Tally form](https://docs.sui.io/onchain-finance/deepbook-predict/contract-information)).
 
+**Train / retrain the ML model:**
+```bash
+npm run collect    # fetch all settled oracles → scripts/training_data.csv
+npm run train      # train logistic regression → scripts/model_weights.json
+npm run retrain    # incremental collect + retrain in one command
+```
+
 ---
 
 ## Project structure
@@ -112,9 +119,20 @@ logs/
 
 ---
 
+## ML model
+
+A logistic regression trained on **3,133 settled BTC oracle outcomes** predicts settlement direction (UP/DOWN) from 12 features: realized volatility, price trend, momentum, range, basis (forward−spot), time-of-day, day-of-week, and interaction terms.
+
+- **CV accuracy: 62.7%** (5-fold, vs 50% random baseline — +12.7pp edge)
+- Gradient boosting also tested (63.2% CV) — LR selected for simplicity of TypeScript export
+- Model retrained automatically every 50 new oracle settlements via `watcher.ts`
+- Weights exported to `scripts/model_weights.json` and loaded at inference time in `src/ml-model.ts`
+
 ## Allocation model
 
-The model (hermes3 via Ollama) receives each cycle:
+The allocation brain is two-layer: the ML model provides the directional signal, hermes3 (via Ollama) decides sizing and generates the natural-language reasoning displayed on the dashboard.
+
+The hermes3 prompt receives each cycle:
 - BTC spot price, forward, time to expiry
 - Realized volatility and price trend from the last 20 oracle price events
 - Current manager balance and realized P&L

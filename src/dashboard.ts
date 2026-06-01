@@ -8,9 +8,11 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+const ROOT = process.cwd();
 import * as child_process from 'child_process';
 import {
   getNearestActiveOracle, getFutureOracles, getLatestPrice, getManagerSummary,
+  getPriceHistory,
 } from './indexer.js';
 import { getDusdcCoins } from './coins.js';
 import { getAddress, client } from './wallet.js';
@@ -18,8 +20,10 @@ import { MANAGER_ID, DUSDC_SCALE, priceToHuman } from './config.js';
 import { computeFeatures } from './features.js';
 
 const PORT         = parseInt(process.env.DASHBOARD_PORT ?? '3002', 10);
-const CYCLES_LOG   = 'logs/cycles.jsonl';
-const SIM_LOG      = 'logs/simulation.json';
+const CYCLES_LOG   = path.join(ROOT, 'logs/cycles.jsonl');
+const SIM_LOG      = path.join(ROOT, 'logs/simulation.json');
+const MODEL_STATS  = path.join(ROOT, 'scripts/model_stats.json');
+const RETRAIN_STATE = path.join(ROOT, 'logs/retrain-state.json');
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 
@@ -64,11 +68,12 @@ app.get('/api/market', async (_req: Request, res: Response) => {
   try {
     const oracle  = await getNearestActiveOracle();
     if (!oracle) { res.json({ oracle: null }); return; }
-    const [price, active] = await Promise.all([
+    const [price, prices, active] = await Promise.all([
       getLatestPrice(oracle.oracle_id),
+      getPriceHistory(oracle.oracle_id),
       getFutureOracles(),
     ]);
-    const features = computeFeatures(oracle, [], price);
+    const features = computeFeatures(oracle, prices, price);
     res.json({ oracle, price, features, active_count: active.length });
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
@@ -97,9 +102,9 @@ app.get('/api/cycles', (_req: Request, res: Response) => {
 
 app.get('/api/model/stats', (_req: Request, res: Response) => {
   try {
-    const stats = JSON.parse(fs.readFileSync('scripts/model_stats.json', 'utf-8'));
+    const stats = JSON.parse(fs.readFileSync(MODEL_STATS, 'utf-8'));
     let retrainState = {};
-    try { retrainState = JSON.parse(fs.readFileSync('logs/retrain-state.json', 'utf-8')); } catch {}
+    try { retrainState = JSON.parse(fs.readFileSync(RETRAIN_STATE, 'utf-8')); } catch {}
     res.json({ ...stats, retrain_state: retrainState });
   } catch {
     res.json(null);
@@ -364,14 +369,17 @@ button:disabled{opacity:.5;cursor:not-allowed}
     </div>
 
     <div class="card">
+      <h2>ML Model</h2>
+      <div id="ml-stats" style="font-size:12px">Loading…</div>
+    </div>
+
+    <div class="card">
       <h2>Methodology</h2>
       <div style="font-size:11px;color:var(--muted);line-height:1.7">
         <div>• <strong style="color:var(--text)">Data</strong>: Real on-chain settled BTC oracles</div>
-        <div>• <strong style="color:var(--text)">Entry</strong>: Earliest price event per oracle</div>
-        <div>• <strong style="color:var(--text)">Rule</strong>: Trend-follow, skip if vol &gt; 15%</div>
+        <div>• <strong style="color:var(--text)">ML model</strong>: Logistic regression, 12 features, 5-fold CV</div>
         <div>• <strong style="color:var(--text)">Ask</strong>: 51.5% ATM (live devInspect)</div>
         <div>• <strong style="color:var(--text)">Return</strong>: Total % over backtest window (no APY extrapolation)</div>
-        <div>• <strong style="color:var(--text)">Entry</strong>: Earliest available price event per oracle</div>
         <div>• <strong style="color:var(--text)">Capital</strong>: 100 dUSDC simulated start</div>
         <div>• <strong style="color:var(--text)">Size</strong>: 5 dUSDC max payout / position</div>
       </div>
@@ -626,9 +634,28 @@ function pollJob(){
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
+async function loadModelStats(){
+  try{
+    const d=await api('/api/model/stats');
+    if(!d){document.getElementById('ml-stats').textContent='Stats not available — run npm run train';return;}
+    const rows=[
+      ['Model','Logistic Regression'],
+      ['Trained on',d.trained_on.toLocaleString()+' oracles'],
+      ['CV Accuracy',(d.cv_accuracy*100).toFixed(1)+'%  (±'+(d.cv_std*100).toFixed(1)+'%)'],
+      ['Edge over random','+'+(d.edge_over_random_pp).toFixed(1)+'pp'],
+      ['Top feature',d.top_features?.[0]?.[0]+' ('+d.top_features[0][1]+')':'—'],
+      ['Last retrained',d.trained_at?new Date(d.trained_at).toLocaleString():'—'],
+    ];
+    document.getElementById('ml-stats').innerHTML=rows.map(([k,v])=>
+      '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)">'+
+      '<span style="color:var(--muted)">'+k+'</span><strong>'+v+'</strong></div>'
+    ).join('');
+  }catch(e){document.getElementById('ml-stats').textContent='Error: '+e.message;}
+}
+
 async function loadAll(){
   document.getElementById('hd-time').textContent=new Date().toLocaleTimeString();
-  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadSim()]);
+  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadSim(),loadModelStats()]);
 }
 
 loadAll();
