@@ -74,6 +74,10 @@ npm run dashboard
 
 **Live execution** — set `LIVE_MODE=true` in `.env` and ensure dUSDC is in your wallet (request via the [Mysten Labs Tally form](https://docs.sui.io/onchain-finance/deepbook-predict/contract-information)).
 
+**Live execution confirmed on Sui testnet:**
+- Deposit + Mint: [`4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a`](https://suiexplorer.com/txblock/4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a?network=testnet)
+- Redeem: [`CPgpMmBzMQaubWBSFm1SZqzDfiyoL4MM7Li9t8MmY3f7`](https://suiexplorer.com/txblock/CPgpMmBzMQaubWBSFm1SZqzDfiyoL4MM7Li9t8MmY3f7?network=testnet)
+
 **Train / retrain the ML model:**
 ```bash
 npm run collect    # fetch all settled oracles → scripts/training_data.csv
@@ -123,8 +127,9 @@ logs/
 
 A logistic regression trained on **3,133 settled BTC oracle outcomes** predicts settlement direction (UP/DOWN) from 12 features: realized volatility, price trend, momentum, range, basis (forward−spot), time-of-day, day-of-week, and interaction terms.
 
-- **CV accuracy: 62.7%** (5-fold, vs 50% random baseline — +12.7pp edge)
-- Gradient boosting also tested (63.2% CV) — LR selected for simplicity of TypeScript export
+- **CV accuracy: 63.2%** (5-fold, vs 50% random baseline — +13.2pp edge)
+- Trained on **5,467 settled oracle outcomes** — grows automatically as new oracles settle
+- Gradient boosting also tested (similar accuracy) — LR selected for simplicity of TypeScript export
 - Model retrained automatically every 50 new oracle settlements via `watcher.ts`
 - Weights exported to `scripts/model_weights.json` and loaded at inference time in `src/ml-model.ts`
 
