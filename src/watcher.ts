@@ -54,15 +54,22 @@ async function maybeRetrain(settledCount: number) {
 // ── Auto-redeem settled positions ─────────────────────────────────────────────
 
 async function autoRedeem(): Promise<number> {
-  const { minted } = await getManagerPositions(MANAGER_ID);
+  const { minted, redeemed: redeemedPositions } = await getManagerPositions(MANAGER_ID);
   if (minted.length === 0) return 0;
 
-  const settled    = await getSettledOracles();
-  const settledIds = new Set(settled.map(o => o.oracle_id));
+  // Skip positions already redeemed (stale indexer entries)
+  const redeemedIds = new Set(redeemedPositions.map((p: any) => p.oracle_id));
+  const settled     = await getSettledOracles();
+  const settledIds  = new Set(settled.map(o => o.oracle_id));
 
   let redeemed = 0;
   for (const pos of minted) {
-    if (!settledIds.has(pos.oracle_id)) continue;
+    // Hard reality gate: a position cannot be settled before its expiry passes.
+    // The indexer's settled-status flag is unreliable near the rollover, so we
+    // require the on-chain expiry timestamp to have actually elapsed.
+    if (pos.expiry >= Date.now()) continue;       // not yet expired
+    if (!settledIds.has(pos.oracle_id)) continue; // indexer hasn't marked settled
+    if (redeemedIds.has(pos.oracle_id)) continue;  // already claimed
     try {
       console.log(`  [redeem] oracle ${pos.oracle_id.slice(0, 12)}… qty=${pos.quantity}`);
       const tx     = buildRedeemPermissionless(
