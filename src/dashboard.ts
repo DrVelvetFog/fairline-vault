@@ -95,6 +95,17 @@ app.get('/api/cycles', (_req: Request, res: Response) => {
   res.json(readCycles(30));
 });
 
+app.get('/api/model/stats', (_req: Request, res: Response) => {
+  try {
+    const stats = JSON.parse(fs.readFileSync('scripts/model_stats.json', 'utf-8'));
+    let retrainState = {};
+    try { retrainState = JSON.parse(fs.readFileSync('logs/retrain-state.json', 'utf-8')); } catch {}
+    res.json({ ...stats, retrain_state: retrainState });
+  } catch {
+    res.json(null);
+  }
+});
+
 app.get('/api/simulation', (_req: Request, res: Response) => {
   const sim = readSim();
   if (!sim) { res.status(404).json({ error: 'No simulation data — run npm run simulate' }); return; }

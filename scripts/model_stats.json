@@ -1,0 +1,44 @@
+{
+  "cv_accuracy": 0.59125,
+  "cv_std": 0.028118,
+  "gb_cv_accuracy": 0.57625,
+  "trained_on": 800,
+  "features": [
+    "realized_vol",
+    "trend_pct",
+    "momentum_pct",
+    "range_pct",
+    "basis_bps",
+    "mins_to_expiry",
+    "vol_regime_enc",
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "trend_x_vol"
+  ],
+  "top_features": [
+    [
+      "realized_vol",
+      -0.4753
+    ],
+    [
+      "trend_pct",
+      0.3858
+    ],
+    [
+      "trend_x_vol",
+      0.3677
+    ],
+    [
+      "vol_regime_enc",
+      0.2422
+    ],
+    [
+      "basis_bps",
+      0.1343
+    ]
+  ],
+  "trained_at": "2026-06-01T18:57:13.298078+00:00",
+  "edge_over_random_pp": 9.12
+}

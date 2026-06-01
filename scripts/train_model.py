@@ -133,7 +133,23 @@ weights = {
 with open(WEIGHTS_OUT, "w") as f:
     json.dump(weights, f, indent=2)
 
+# Write model stats for dashboard
+from datetime import datetime, timezone
+stats = {
+    "cv_accuracy":    round(float(lr_scores.mean()), 6),
+    "cv_std":         round(float(lr_scores.std()), 6),
+    "gb_cv_accuracy": round(float(gb_scores.mean()), 6),
+    "trained_on":     len(df),
+    "features":       FEATURES,
+    "top_features":   [(f, round(c, 4)) for f, c in coef_pairs[:5]],
+    "trained_at":     datetime.now(timezone.utc).isoformat(),
+    "edge_over_random_pp": round((lr_scores.mean() - 0.5) * 100, 2),
+}
+with open("scripts/model_stats.json", "w") as f:
+    json.dump(stats, f, indent=2)
+
 print(f"\n✅ Weights exported → {WEIGHTS_OUT}")
 print(f"   CV accuracy: {lr_scores.mean():.4f} ({lr_scores.mean()*100:.1f}%)")
 print(f"   Random baseline: 50.0%")
 print(f"   Edge over random: {(lr_scores.mean() - 0.5)*100:+.1f}pp")
+print(f"   Stats → scripts/model_stats.json")

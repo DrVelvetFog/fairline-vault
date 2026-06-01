@@ -14,6 +14,10 @@
     "cycle": "tsx src/cycle.ts",
     "cycle:watch": "watch -n 60 tsx src/cycle.ts",
     "simulate": "tsx src/simulate.ts",
+    "collect": "python3 scripts/collect_training_data.py",
+    "collect:incr": "python3 scripts/collect_training_data.py --incr",
+    "train": "python3 scripts/train_model.py",
+    "retrain": "python3 scripts/retrain.py",
     "build": "tsc",
     "start": "node dist/index.js"
   },

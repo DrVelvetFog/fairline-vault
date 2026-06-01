@@ -16,8 +16,40 @@ import { getSettledOracles, getManagerPositions, getManagerSummary } from './ind
 import { buildRedeemPermissionless } from './transactions.js';
 import { execute, getAddress } from './wallet.js';
 import { MANAGER_ID, DUSDC_SCALE } from './config.js';
+import * as child_process from 'child_process';
+import * as fs from 'fs';
 
-const POLL_INTERVAL_MS = 60_000; // 1 minute — fast enough to catch new oracles within 1 min of expiry
+const POLL_INTERVAL_MS   = 60_000;  // 1 minute
+const RETRAIN_EVERY_N    = 50;      // retrain after this many new settled oracles
+const RETRAIN_STATE_FILE = 'logs/retrain-state.json';
+
+// ── Retrain trigger ───────────────────────────────────────────────────────────
+
+function loadRetrainState(): { last_count: number; last_retrain: string } {
+  try { return JSON.parse(fs.readFileSync(RETRAIN_STATE_FILE, 'utf-8')); }
+  catch { return { last_count: 0, last_retrain: 'never' }; }
+}
+
+function saveRetrainState(state: { last_count: number; last_retrain: string }) {
+  fs.writeFileSync(RETRAIN_STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+async function maybeRetrain(settledCount: number) {
+  const state = loadRetrainState();
+  const newSince = settledCount - state.last_count;
+  if (newSince < RETRAIN_EVERY_N) return;
+
+  console.log(`\n[retrain] ${newSince} new oracles since last retrain — retraining…`);
+  const proc = child_process.spawnSync('python3', ['scripts/retrain.py'], {
+    cwd: process.cwd(), encoding: 'utf-8',
+  });
+  if (proc.status === 0) {
+    console.log('[retrain] ✅ complete — weights reloaded on next cycle');
+    saveRetrainState({ last_count: settledCount, last_retrain: new Date().toISOString() });
+  } else {
+    console.error('[retrain] ❌ failed:', proc.stderr?.slice(0, 200));
+  }
+}
 
 // ── Auto-redeem settled positions ─────────────────────────────────────────────
 
@@ -63,7 +95,11 @@ async function tick() {
       console.log(`  Balance: ${bal.toFixed(4)} dUSDC  |  Realized P&L: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} dUSDC`);
     }
 
-    // 2. Run allocation cycle (has built-in "already entered" guard)
+    // 2. Check if retrain is due
+    const settled = await getSettledOracles();
+    await maybeRetrain(settled.length);
+
+    // 3. Run allocation cycle (has built-in "already entered" guard)
     await runCycle();
 
   } catch (e) {

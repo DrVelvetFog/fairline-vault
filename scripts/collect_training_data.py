@@ -1,22 +1,25 @@
 """
 Collect training data from settled DeepBook Predict oracles.
 
+Modes:
+  python3 scripts/collect_training_data.py          # fetch all available oracles
+  python3 scripts/collect_training_data.py --incr   # only fetch oracles newer than CSV
+
 For each settled oracle:
   - Fetch price history (100 most recent events)
   - Compute features at entry (earliest available prices)
   - Compute label: did BTC settle ABOVE or BELOW entry price?
-  - Save to CSV for model training
+  - Append to CSV for model training
 
 Outputs: scripts/training_data.csv
-Run:     python3 scripts/collect_training_data.py
 """
 
-import json, math, urllib.request, time, csv, sys
+import json, math, urllib.request, csv, sys, os
 from datetime import datetime, timezone
 
-INDEXER = "https://predict-server.testnet.mystenlabs.com"
-N_ORACLES = 800   # fetch this many settled oracles
-OUT_PATH  = "scripts/training_data.csv"
+INDEXER  = "https://predict-server.testnet.mystenlabs.com"
+OUT_PATH = "scripts/training_data.csv"
+INCREMENTAL = "--incr" in sys.argv
 
 def get(path):
     url = f"{INDEXER}{path}"
@@ -127,12 +130,33 @@ def compute_features(prices_raw, oracle):
         "move_pct":           round((settle - entry_spot) / entry_spot * 100, 6),
     }
 
+def load_existing_oracle_ids():
+    """Return set of oracle IDs already in the CSV."""
+    if not os.path.exists(OUT_PATH):
+        return set()
+    with open(OUT_PATH, newline="") as f:
+        reader = csv.DictReader(f)
+        return {row["oracle_id"] for row in reader}
+
 def main():
-    print(f"Fetching settled oracles…")
+    existing_ids = load_existing_oracle_ids()
+    mode = "incremental" if INCREMENTAL else "full"
+    print(f"Mode: {mode} | Existing rows: {len(existing_ids)}")
+
+    print("Fetching settled oracles…")
     all_oracles = get("/oracles?status=settled")
     with_price  = [o for o in all_oracles if o.get("settlement_price") is not None]
-    oracles     = sorted(with_price, key=lambda o: o["expiry"], reverse=True)[:N_ORACLES]
-    print(f"Using {len(oracles)} oracles ({oracles[-1]['expiry']//1000} → {oracles[0]['expiry']//1000})")
+
+    if INCREMENTAL and existing_ids:
+        oracles = [o for o in with_price if o["oracle_id"] not in existing_ids]
+        print(f"New oracles since last run: {len(oracles)}")
+    else:
+        oracles = sorted(with_price, key=lambda o: o["expiry"])  # all, oldest first
+        print(f"Total oracles with settlement price: {len(oracles)}")
+
+    if not oracles:
+        print("No new oracles to process.")
+        return 0
 
     rows = []
     errors = 0
@@ -149,30 +173,35 @@ def main():
         sys.stdout.write(f"\r  Processed {i+1}/{len(oracles)} ({len(rows)} valid, {errors} errors)")
         sys.stdout.flush()
 
-    print(f"\n\nCollected {len(rows)} training examples")
+    print(f"\n\nNew examples collected: {len(rows)}")
 
     if not rows:
-        print("No data collected — exiting")
-        return
+        print("Nothing new to write.")
+        return 0
 
-    # Write CSV
-    fieldnames = list(rows[0].keys())
-    with open(OUT_PATH, "w", newline="") as f:
+    # Append to CSV (or create with header if new)
+    file_exists = os.path.exists(OUT_PATH)
+    fieldnames  = list(rows[0].keys())
+    with open(OUT_PATH, "a" if (INCREMENTAL and file_exists) else "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
+        if not (INCREMENTAL and file_exists):
+            writer.writeheader()
         writer.writerows(rows)
 
-    print(f"Saved → {OUT_PATH}")
+    # Count total rows in CSV
+    with open(OUT_PATH, newline="") as f:
+        total_rows = sum(1 for _ in csv.reader(f)) - 1  # subtract header
 
-    # Quick label stats
+    print(f"Saved → {OUT_PATH}  (total rows: {total_rows})")
+
+    # Quick label stats for new rows
     up_count   = sum(r["label_up"] for r in rows)
     down_count = len(rows) - up_count
-    print(f"\nLabel distribution:")
+    print(f"\nNew label distribution:")
     print(f"  UP   (settle > ATM): {up_count}  ({up_count/len(rows)*100:.1f}%)")
     print(f"  DOWN (settle ≤ ATM): {down_count}  ({down_count/len(rows)*100:.1f}%)")
-    print(f"\nAvg move_pct  : {sum(r['move_pct'] for r in rows)/len(rows):.4f}%")
-    print(f"Avg vol       : {sum(r['realized_vol'] for r in rows)/len(rows):.2f}%")
-    print(f"Avg trend_pct : {sum(r['trend_pct'] for r in rows)/len(rows):.6f}%")
+    return len(rows)
 
 if __name__ == "__main__":
-    main()
+    result = main()
+    sys.exit(0 if result is not None else 1)
