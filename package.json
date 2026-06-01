@@ -11,6 +11,7 @@
     "watcher": "tsx src/watcher.ts",
     "first-trade": "tsx src/first-trade.ts",
     "redeem": "tsx src/redeem.ts",
+    "summary": "tsx src/daily-summary.ts",
     "cycle": "tsx src/cycle.ts",
     "cycle:watch": "watch -n 60 tsx src/cycle.ts",
     "simulate": "tsx src/simulate.ts",

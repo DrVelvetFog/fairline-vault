@@ -115,6 +115,14 @@ app.get('/api/cycles', (_req: Request, res: Response) => {
   res.json(readCycles(30));
 });
 
+app.get('/api/summary', (_req: Request, res: Response) => {
+  try {
+    res.json(JSON.parse(fs.readFileSync(path.join(ROOT, 'logs/daily-summary.json'), 'utf-8')));
+  } catch {
+    res.json(null);
+  }
+});
+
 app.get('/api/model/stats', (_req: Request, res: Response) => {
   try {
     const stats = JSON.parse(fs.readFileSync(MODEL_STATS, 'utf-8'));
@@ -393,6 +401,11 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <div class="card">
       <h2>FairLine Metrics</h2>
       <div id="sim-metrics" style="font-size:12px">—</div>
+    </div>
+
+    <div class="card">
+      <h2>Live Trading Results (testnet)</h2>
+      <div id="live-results" style="font-size:12px">Loading…</div>
     </div>
 
     <div class="card">
@@ -680,9 +693,32 @@ async function loadModelStats(){
   }catch(e){document.getElementById('ml-stats').textContent='Error: '+e.message;}
 }
 
+async function loadLiveResults(){
+  try{
+    const d=await api('/api/summary');
+    if(!d||d.total_trades===0){document.getElementById('live-results').innerHTML='<div style="color:var(--muted)">No completed trades yet — first results appear after a position settles.</div>';return;}
+    const wr=(d.overall_win_rate*100);
+    const wrColor=wr>=51.5?'var(--green)':'var(--red)';
+    const pnlColor=d.net_pnl>=0?'var(--green)':'var(--red)';
+    let html=
+      '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">Completed trades</span><strong>'+d.total_trades+'</strong></div>'+
+      '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">Win / Loss</span><strong>'+d.total_wins+'W / '+d.total_losses+'L</strong></div>'+
+      '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">Win rate</span><strong style="color:'+wrColor+'">'+wr.toFixed(1)+'% <span style="color:var(--muted);font-weight:400">(BE 51.5%)</span></strong></div>'+
+      '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">Net P&L</span><strong style="color:'+pnlColor+'">'+(d.net_pnl>=0?'+':'')+d.net_pnl.toFixed(4)+' dUSDC</strong></div>'+
+      '<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--muted)">Open positions</span><strong>'+d.open_positions+'</strong></div>';
+    if(d.days&&d.days.length){
+      html+='<div style="margin-top:10px;font-size:10px;color:var(--muted);text-transform:uppercase">By day</div>';
+      for(const day of d.days){
+        html+='<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px"><span>'+day.day.slice(5)+'  '+day.wins+'/'+day.losses+'</span><span style="color:'+(day.net_pnl>=0?'var(--green)':'var(--red)')+'">'+(day.net_pnl>=0?'+':'')+day.net_pnl.toFixed(3)+'</span></div>';
+      }
+    }
+    document.getElementById('live-results').innerHTML=html;
+  }catch(e){document.getElementById('live-results').textContent='Error: '+e.message;}
+}
+
 async function loadAll(){
   document.getElementById('hd-time').textContent=new Date().toLocaleTimeString();
-  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadSim(),loadModelStats()]);
+  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadSim(),loadModelStats(),loadLiveResults()]);
 }
 
 loadAll();

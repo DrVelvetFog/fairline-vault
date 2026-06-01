@@ -316,5 +316,50 @@
     "executed": false,
     "tx_digests": [],
     "sim_only": false
+  },
+  {
+    "ts": "2026-06-01T20:32:36.031Z",
+    "oracle_id": "0xa8136a8d17e517f11618caaf63c9953edee4fd643ae850e101d11c68ce33791e",
+    "expiry": "2026-06-01T20:45:00.000Z",
+    "spot_usd": 71529.94844322,
+    "features": {
+      "oracle_id": "0xa8136a8d17e517f11618caaf63c9953edee4fd643ae850e101d11c68ce33791e",
+      "underlying": "BTC",
+      "expiry_ms": 1780346700000,
+      "spot_usd": 71529.94844322,
+      "forward_usd": 71529.255676343,
+      "min_strike_usd": 50000,
+      "tick_usd": 1,
+      "time_to_expiry_min": 12.3486,
+      "hour_utc": 20,
+      "day_of_week": 0,
+      "realized_vol_pct": 2.49,
+      "price_trend": "down",
+      "price_change_pct": -0.0224,
+      "momentum_pct": -0.0063,
+      "range_pct": 0.0113,
+      "basis_bps": -0.1,
+      "price_high_usd": 71550.1,
+      "price_low_usd": 71542.02,
+      "n_prices": 20
+    },
+    "decision": {
+      "reasoning": "The ML model is highly confident that BTC will be down, and realized volatility is very low at just 2.49%, so it's a good time to take a directional position with a DOWN option while the trend is clear.",
+      "supply_usdc": 0,
+      "positions": [
+        {
+          "type": "down",
+          "strike": 71530,
+          "quantity_usdc": 5
+        }
+      ],
+      "confidence": "high",
+      "skip": false
+    },
+    "executed": true,
+    "tx_digests": [
+      "7pRfnBDPZJXfbewYwj1fdEmLmdtzoDWw23DhuBj6J6dg"
+    ],
+    "sim_only": false
   }
 ]

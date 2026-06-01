@@ -11,10 +11,23 @@ module.exports = {
       max_restarts: 10,
       restart_delay: 5000,
       env: {
-        LIVE_MODE: 'false',   // change to 'true' for live execution
+        LIVE_MODE: 'true',
       },
       error_file:   'logs/watcher-err.log',
       out_file:     'logs/watcher-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    },
+    {
+      name:          'fairline-summary',
+      script:        'npx',
+      args:          'tsx src/daily-summary.ts',
+      cwd:           __dirname,
+      interpreter:   'none',
+      autorestart:   false,        // one-shot job
+      cron_restart:  '0 * * * *',  // re-run every hour on the hour
+      env:           {},
+      error_file:    'logs/summary-err.log',
+      out_file:      'logs/summary-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },
     {
