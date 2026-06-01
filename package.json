@@ -1,0 +1,30 @@
+{
+  "name": "deepbook-vault",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "market": "tsx src/market.ts",
+    "setup": "tsx src/setup.ts",
+    "dashboard": "tsx src/dashboard.ts",
+    "first-trade": "tsx src/first-trade.ts",
+    "redeem": "tsx src/redeem.ts",
+    "cycle": "tsx src/cycle.ts",
+    "cycle:watch": "watch -n 60 tsx src/cycle.ts",
+    "simulate": "tsx src/simulate.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@mysten/sui": "^1.45.2",
+    "@types/express": "^5.0.6",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

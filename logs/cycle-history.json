@@ -1,0 +1,104 @@
+[
+  {
+    "ts": "2026-06-01T15:31:55.972Z",
+    "oracle_id": "0xcdf5a5febff6689cb513f5e36e9efd9950ec166e08340864b3273fc5cf1dd564",
+    "expiry": "2026-06-01T15:45:00.000Z",
+    "spot_usd": 71207.858345847,
+    "features": {
+      "oracle_id": "0xcdf5a5febff6689cb513f5e36e9efd9950ec166e08340864b3273fc5cf1dd564",
+      "underlying": "BTC",
+      "expiry_ms": 1780328700000,
+      "spot_usd": 71207.858345847,
+      "forward_usd": 71201.179288277,
+      "min_strike_usd": 50000,
+      "tick_usd": 1,
+      "time_to_expiry_min": 13.04075,
+      "realized_vol_pct": 6.49,
+      "price_trend": "up",
+      "price_change_pct": 0.2888,
+      "basis_bps": -0.9,
+      "price_high_usd": 71007.21,
+      "price_low_usd": 70987.76,
+      "n_prices": 20
+    },
+    "decision": {
+      "reasoning": "Balance too low: 0.0000 dUSDC",
+      "supply_usdc": 0,
+      "positions": [],
+      "confidence": "low",
+      "skip": true,
+      "skip_reason": "Balance too low: 0.0000 dUSDC"
+    },
+    "executed": false,
+    "tx_digests": [],
+    "sim_only": true
+  },
+  {
+    "ts": "2026-06-01T15:37:21.629Z",
+    "oracle_id": "0xcdf5a5febff6689cb513f5e36e9efd9950ec166e08340864b3273fc5cf1dd564",
+    "expiry": "2026-06-01T15:45:00.000Z",
+    "spot_usd": 71321.752207586,
+    "features": {
+      "oracle_id": "0xcdf5a5febff6689cb513f5e36e9efd9950ec166e08340864b3273fc5cf1dd564",
+      "underlying": "BTC",
+      "expiry_ms": 1780328700000,
+      "spot_usd": 71321.752207586,
+      "forward_usd": 71332.468145249,
+      "min_strike_usd": 50000,
+      "tick_usd": 1,
+      "time_to_expiry_min": 7.614516666666667,
+      "realized_vol_pct": 9.89,
+      "price_trend": "flat",
+      "price_change_pct": 0.0125,
+      "basis_bps": 1.5,
+      "price_high_usd": 71321.94,
+      "price_low_usd": 71291.26,
+      "n_prices": 20
+    },
+    "decision": {
+      "reasoning": "Balance too low: 0.0000 dUSDC",
+      "supply_usdc": 0,
+      "positions": [],
+      "confidence": "low",
+      "skip": true,
+      "skip_reason": "Balance too low: 0.0000 dUSDC"
+    },
+    "executed": false,
+    "tx_digests": [],
+    "sim_only": true
+  },
+  {
+    "ts": "2026-06-01T15:51:29.095Z",
+    "oracle_id": "0xfd9fbcf2a7833382ce07a940974c18b0dbf000d5b9583d6a4df9d0a0b8c570d7",
+    "expiry": "2026-06-01T16:00:00.000Z",
+    "spot_usd": 71057.450629579,
+    "features": {
+      "oracle_id": "0xfd9fbcf2a7833382ce07a940974c18b0dbf000d5b9583d6a4df9d0a0b8c570d7",
+      "underlying": "BTC",
+      "expiry_ms": 1780329600000,
+      "spot_usd": 71057.450629579,
+      "forward_usd": 71058.046500159,
+      "min_strike_usd": 50000,
+      "tick_usd": 1,
+      "time_to_expiry_min": 8.476933333333333,
+      "realized_vol_pct": 4.91,
+      "price_trend": "flat",
+      "price_change_pct": -0.0098,
+      "basis_bps": 0.1,
+      "price_high_usd": 71075.33,
+      "price_low_usd": 71060.42,
+      "n_prices": 20
+    },
+    "decision": {
+      "reasoning": "Balance too low: 0.0000 dUSDC",
+      "supply_usdc": 0,
+      "positions": [],
+      "confidence": "low",
+      "skip": true,
+      "skip_reason": "Balance too low: 0.0000 dUSDC"
+    },
+    "executed": false,
+    "tx_digests": [],
+    "sim_only": true
+  }
+]
