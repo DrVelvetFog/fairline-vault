@@ -242,7 +242,19 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
 <header>
   <div class="header-left">
-    <div class="logo">Fair<span>Line</span></div>
+    <div class="logo" style="display:flex;align-items:center;gap:10px">
+    <svg width="32" height="32" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <rect width="120" height="120" rx="28" fill="#16120e"/>
+      <line x1="20" y1="60" x2="100" y2="60" stroke="#ece2d0" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 9" opacity="0.65"/>
+      <path d="M52 60 L94 87" stroke="#8c8170" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="94" cy="87" r="4.5" fill="#8c8170"/>
+      <path d="M52 60 L94 33" stroke="#ff4d2e" stroke-width="6.5" stroke-linecap="round"/>
+      <circle cx="94" cy="33" r="5.5" fill="#ff4d2e"/>
+      <circle cx="52" cy="60" r="7.5" fill="#ece2d0"/>
+      <circle cx="52" cy="60" r="3.2" fill="#16120e"/>
+    </svg>
+    Fair<span>Line</span>
+  </div>
     <div>
       <div id="hd-spot">—</div>
       <div id="hd-expiry">Loading market…</div>

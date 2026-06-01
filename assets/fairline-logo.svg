@@ -1,0 +1,21 @@
+<svg width="560" height="150" viewBox="0 0 560 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FairLine">
+  <!-- MARK -->
+  <g transform="translate(15,15)">
+    <rect x="0" y="0" width="120" height="120" rx="28" fill="#16120e"/>
+    <!-- fair-value reference line -->
+    <line x1="20" y1="60" x2="100" y2="60" stroke="#ece2d0" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 9" opacity="0.65"/>
+    <!-- down outcome (muted) -->
+    <path d="M52 60 L94 87" stroke="#8c8170" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="94" cy="87" r="4.5" fill="#8c8170"/>
+    <!-- up outcome (accent — the prediction) -->
+    <path d="M52 60 L94 33" stroke="#ff4d2e" stroke-width="6.5" stroke-linecap="round"/>
+    <circle cx="94" cy="33" r="5.5" fill="#ff4d2e"/>
+    <!-- decision node on the fair line -->
+    <circle cx="52" cy="60" r="7.5" fill="#ece2d0"/>
+    <circle cx="52" cy="60" r="3.2" fill="#16120e"/>
+  </g>
+  <!-- WORDMARK -->
+  <text x="156" y="95" font-family="'Hanken Grotesk','Helvetica Neue',Arial,sans-serif" font-size="62" font-weight="700" letter-spacing="-1.5">
+    <tspan fill="#1d1813">Fair</tspan><tspan fill="#ff4d2e">Line</tspan>
+  </text>
+</svg>
