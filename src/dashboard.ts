@@ -658,7 +658,7 @@ async function loadModelStats(){
       ['Trained on',d.trained_on.toLocaleString()+' oracles'],
       ['CV Accuracy',(d.cv_accuracy*100).toFixed(1)+'%  (±'+(d.cv_std*100).toFixed(1)+'%)'],
       ['Edge over random','+'+(d.edge_over_random_pp).toFixed(1)+'pp'],
-      ['Top feature',d.top_features?.[0]?.[0]+' ('+d.top_features[0][1]+')':'—'],
+      ['Top feature',d.top_features?.[0] ? d.top_features[0][0]+' ('+d.top_features[0][1]+')' : '—'],
       ['Last retrained',d.trained_at?new Date(d.trained_at).toLocaleString():'—'],
     ];
     document.getElementById('ml-stats').innerHTML=rows.map(([k,v])=>
@@ -681,6 +681,7 @@ setInterval(loadAll,60000);
 
 app.get('/', (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.send(HTML);
 });
 
