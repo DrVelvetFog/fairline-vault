@@ -202,5 +202,81 @@
     "executed": false,
     "tx_digests": [],
     "sim_only": true
+  },
+  {
+    "ts": "2026-06-01T18:49:17.266Z",
+    "oracle_id": "0x21d0ccc41cdf48f8171ab8bed02bebb2173f618e6ba1f6ec0fc680ffb509476a",
+    "expiry": "2026-06-01T19:00:00.000Z",
+    "spot_usd": 71401.262689432,
+    "features": {
+      "oracle_id": "0x21d0ccc41cdf48f8171ab8bed02bebb2173f618e6ba1f6ec0fc680ffb509476a",
+      "underlying": "BTC",
+      "expiry_ms": 1780340400000,
+      "spot_usd": 71401.262689432,
+      "forward_usd": 71401.115753631,
+      "min_strike_usd": 50000,
+      "tick_usd": 1,
+      "time_to_expiry_min": 10.6916,
+      "hour_utc": 18,
+      "day_of_week": 0,
+      "realized_vol_pct": 3.02,
+      "price_trend": "flat",
+      "price_change_pct": -0.0156,
+      "momentum_pct": 0.0002,
+      "range_pct": 0.0121,
+      "basis_bps": 0,
+      "price_high_usd": 71417.95,
+      "price_low_usd": 71409.32,
+      "n_prices": 20
+    },
+    "decision": {
+      "reasoning": "Balance too low: 0.0000 dUSDC",
+      "supply_usdc": 0,
+      "positions": [],
+      "confidence": "low",
+      "skip": true,
+      "skip_reason": "Balance too low: 0.0000 dUSDC"
+    },
+    "executed": false,
+    "tx_digests": [],
+    "sim_only": true
+  },
+  {
+    "ts": "2026-06-01T18:50:05.388Z",
+    "oracle_id": "0x21d0ccc41cdf48f8171ab8bed02bebb2173f618e6ba1f6ec0fc680ffb509476a",
+    "expiry": "2026-06-01T19:00:00.000Z",
+    "spot_usd": 71353.046012451,
+    "features": {
+      "oracle_id": "0x21d0ccc41cdf48f8171ab8bed02bebb2173f618e6ba1f6ec0fc680ffb509476a",
+      "underlying": "BTC",
+      "expiry_ms": 1780340400000,
+      "spot_usd": 71353.046012451,
+      "forward_usd": 71353.91080763,
+      "min_strike_usd": 50000,
+      "tick_usd": 1,
+      "time_to_expiry_min": 9.88605,
+      "hour_utc": 18,
+      "day_of_week": 0,
+      "realized_vol_pct": 2.81,
+      "price_trend": "down",
+      "price_change_pct": -0.0631,
+      "momentum_pct": 0.0084,
+      "range_pct": 0.0202,
+      "basis_bps": 0.1,
+      "price_high_usd": 71409.37,
+      "price_low_usd": 71394.95,
+      "n_prices": 20
+    },
+    "decision": {
+      "reasoning": "Balance too low: 0.0000 dUSDC",
+      "supply_usdc": 0,
+      "positions": [],
+      "confidence": "low",
+      "skip": true,
+      "skip_reason": "Balance too low: 0.0000 dUSDC"
+    },
+    "executed": false,
+    "tx_digests": [],
+    "sim_only": true
   }
 ]

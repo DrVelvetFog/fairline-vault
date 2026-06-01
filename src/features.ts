@@ -20,11 +20,15 @@ export interface MarketFeatures {
 
   // Time
   time_to_expiry_min: number;
+  hour_utc:           number;  // 0-23, UTC hour at entry
+  day_of_week:        number;  // 0=Mon, 6=Sun
 
   // Derived from price history (last ~20 events)
   realized_vol_pct:   number;   // annualized % vol from log returns
   price_trend:        'up' | 'down' | 'flat';
   price_change_pct:   number;   // % change over the price history window
+  momentum_pct:       number;   // second half mean vs first half mean
+  range_pct:          number;   // (high-low)/mid over window
   basis_bps:          number;   // (forward - spot) / spot in bps
 
   // Price history summary (for prompt context)
@@ -78,6 +82,22 @@ export function computeFeatures(
   // Basis
   const basisBps = spot > 0 ? ((forward - spot) / spot) * 10_000 : 0;
 
+  // Momentum: second-half mean vs first-half mean of entry window
+  const mid         = Math.floor(window.length / 2);
+  const firstHalf   = window.slice(0, mid);
+  const secondHalf  = window.slice(mid);
+  const firstMean   = firstHalf.reduce((a, b) => a + priceToHuman(b.spot), 0) / (firstHalf.length || 1);
+  const secondMean  = secondHalf.reduce((a, b) => a + priceToHuman(b.spot), 0) / (secondHalf.length || 1);
+  const momentumPct = firstMean > 0 ? ((secondMean - firstMean) / firstMean) * 100 : 0;
+
+  // Price range
+  const rangePct = spot > 0 ? ((priceHigh - priceLow) / spot) * 100 : 0;
+
+  // Time context
+  const entryDate  = new Date(window.length > 0 ? window[0].checkpoint_timestamp_ms : now);
+  const hourUtc    = entryDate.getUTCHours();
+  const dayOfWeek  = entryDate.getUTCDay() === 0 ? 6 : entryDate.getUTCDay() - 1; // 0=Mon
+
   return {
     oracle_id:           oracle.oracle_id,
     underlying:          oracle.underlying_asset,
@@ -87,9 +107,13 @@ export function computeFeatures(
     min_strike_usd:      priceToHuman(oracle.min_strike),
     tick_usd:            priceToHuman(oracle.tick_size),
     time_to_expiry_min:  (oracle.expiry - now) / 60_000,
+    hour_utc:            hourUtc,
+    day_of_week:         dayOfWeek,
     realized_vol_pct:    Math.round(realizedVol * 100) / 100,
     price_trend:         trend,
     price_change_pct:    Math.round(priceChangePct * 10_000) / 10_000,
+    momentum_pct:        Math.round(momentumPct * 10_000) / 10_000,
+    range_pct:           Math.round(rangePct * 10_000) / 10_000,
     basis_bps:           Math.round(basisBps * 10) / 10,
     price_high_usd:      Math.round(priceHigh * 100) / 100,
     price_low_usd:       Math.round(priceLow * 100) / 100,

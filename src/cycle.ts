@@ -16,6 +16,7 @@ import {
 } from './indexer.js';
 import { computeFeatures } from './features.js';
 import { decide, ping, AllocationDecision, CycleContext } from './model.js';
+import { predict as mlPredict, formatPrediction } from './ml-model.js';
 import {
   buildDepositAndMint, buildDepositAndMintRange, buildSupply,
 } from './transactions.js';
@@ -193,6 +194,13 @@ export async function runCycle(): Promise<void> {
     realized_pnl:   pnlH,
     recent_history: loadHistory(),
   };
+
+  // Run trained ML model for directional signal
+  const mlPrediction = mlPredict(features);
+  console.log(`ML model: ${formatPrediction(mlPrediction)}`);
+
+  // Pass ML signal to hermes3 — it will use it for direction, decide sizing itself
+  ctx.ml_prediction = mlPrediction;
 
   console.log('Asking hermes3…');
   const decision = await decide(ctx);

@@ -9,6 +9,7 @@
  */
 
 import { MarketFeatures } from './features.js';
+import { predict as mlPredict, formatPrediction, MLPrediction } from './ml-model.js';
 
 const OLLAMA_URL  = 'http://127.0.0.1:11434';
 const MODEL       = 'hermes3:latest';
@@ -37,6 +38,7 @@ export interface CycleContext {
   balance_usdc:   number;             // current manager balance (human dUSDC)
   realized_pnl:   number;             // cumulative realized P&L (human dUSDC)
   recent_history: string;             // summary of last N cycle outcomes
+  ml_prediction?: MLPrediction;       // trained model signal (injected by cycle.ts)
 }
 
 // ── Prompt builders ───────────────────────────────────────────────────────────
@@ -93,7 +95,11 @@ function buildUserPrompt(ctx: CycleContext): string {
   // Snap ATM strike to nearest dollar
   const atm = Math.round(f.spot_usd);
 
-  return `MARKET STATE — ${new Date().toISOString()}
+  const mlLine = ctx.ml_prediction
+    ? `\nML MODEL SIGNAL  : ${formatPrediction(ctx.ml_prediction)} — trust this signal, it has 59.1% cross-validated accuracy`
+    : '';
+
+  return `MARKET STATE — ${new Date().toISOString()}${mlLine}
 Asset          : ${f.underlying}
 Spot           : $${f.spot_usd.toFixed(2)}
 Forward        : $${f.forward_usd.toFixed(2)}
