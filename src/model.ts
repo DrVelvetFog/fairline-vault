@@ -10,6 +10,7 @@
 
 import { MarketFeatures } from './features.js';
 import { predict as mlPredict, formatPrediction, MLPrediction } from './ml-model.js';
+import { MIN_POSITION_PCT, MAX_POSITION_PCT, MAX_CYCLE_DEPLOY } from './config.js';
 
 const OLLAMA_URL  = 'http://127.0.0.1:11434';
 const MODEL       = 'hermes3:latest';
@@ -59,23 +60,23 @@ PROTOCOL RULES:
 - Strike must be a whole dollar amount, minimum $50,000
 
 ALLOCATION CONSTRAINTS:
-- Deploy at most 70% of balance per cycle (keep 30% reserve for gas + future cycles)
-- Minimum position size: 1.0 dUSDC quantity
-- Maximum 3 positions per cycle to keep it clean
+- Deploy at most 15% of balance per cycle (3 positions × 5% max each)
+- POSITION SIZING: scale to your confidence level — see POSITION SIZING in the prompt
+- Maximum 3 positions per cycle
 - Skip the cycle if time_to_expiry < 3 minutes (too late to enter safely)
-- Skip if balance < 2.0 dUSDC
+- Skip if balance < 50 dUSDC
 
 WHEN TO USE EACH ALLOCATION TYPE:
-- supply_usdc > 0  : when vol is HIGH (>10%) or trend is FLAT — earn the spread as counterparty instead of taking direction
-- mint UP/DOWN     : when vol is LOW-MODERATE (<10%) and trend is clear — directional conviction play
-- mint RANGE       : when vol is MODERATE and price has been ranging — bet on BTC staying within a $10 band
-- Mix supply + position is valid — e.g. supply 5 dUSDC for passive yield while minting 3 dUSDC directional
+- You only reach this point when vol < 15% — so directional trades are valid
+- mint UP/DOWN : vol < 10% and trend is clear — use confidence-scaled size
+- mint RANGE   : vol 5-10% and price ranging — bet on BTC staying in a $10 band
+- supply_usdc  : flat trend or vol 10-15% — earn spread as LP
 
 GUIDANCE:
-- Flat trend + any vol → prefer supply over skipping (earn spread passively)
-- Vol > 10% → lean toward supply (wider spread = more LP income)
-- Vol < 5% + clear trend → directional mint
-- Vol 5-10% + trend → split: some supply, some direction
+- Vol < 5% + clear trend → directional mint, high confidence size
+- Vol 5-10% + trend → directional mint, medium confidence size
+- Vol 10-15% + flat trend → supply, or small directional with low confidence size
+- Trust the ML model signal — it has a validated edge at this vol level
 
 OUTPUT: Return ONLY valid JSON, no other text. Schema:
 {
@@ -92,7 +93,12 @@ OUTPUT: Return ONLY valid JSON, no other text. Schema:
 
 function buildUserPrompt(ctx: CycleContext): string {
   const f = ctx.features;
-  const deployable = Math.floor(ctx.balance_usdc * 0.7 * 100) / 100;
+  const deployable = Math.floor(ctx.balance_usdc * MAX_CYCLE_DEPLOY * 100) / 100;
+
+  // Position size targets scaled to current balance
+  const sizeHigh = Math.floor(ctx.balance_usdc * MAX_POSITION_PCT * 100) / 100;
+  const sizeMed  = Math.floor(ctx.balance_usdc * (MAX_POSITION_PCT * 0.6) * 100) / 100;
+  const sizeLow  = Math.floor(ctx.balance_usdc * MIN_POSITION_PCT * 100) / 100;
 
   // Snap ATM strike to nearest dollar
   const atm = Math.round(f.spot_usd);
@@ -113,10 +119,15 @@ Range (window) : $${f.price_low_usd.toFixed(2)} – $${f.price_high_usd.toFixed(
 Basis          : ${f.basis_bps.toFixed(1)} bps (forward vs spot)
 
 MANAGER STATE
-Balance        : ${ctx.balance_usdc.toFixed(6)} dUSDC
-Deployable     : ${deployable.toFixed(2)} dUSDC (70% of balance)
-Realized P&L   : ${ctx.realized_pnl >= 0 ? '+' : ''}${ctx.realized_pnl.toFixed(6)} dUSDC
+Balance        : ${ctx.balance_usdc.toFixed(2)} dUSDC
+Max deploy     : ${deployable.toFixed(2)} dUSDC (15% of balance per cycle)
+Realized P&L   : ${ctx.realized_pnl >= 0 ? '+' : ''}${ctx.realized_pnl.toFixed(4)} dUSDC
 PLP locked     : ${ctx.current_plp_usdc.toFixed(2)} / ${ctx.max_plp_usdc} dUSDC max  ← DO NOT supply if already at cap
+
+POSITION SIZING — use these exact quantities (scaled to balance), do NOT use fixed numbers like 1, 3, or 5:
+High confidence : ${sizeHigh.toFixed(2)} dUSDC  (~${(MAX_POSITION_PCT * 100).toFixed(0)}% of balance)
+Medium confidence: ${sizeMed.toFixed(2)} dUSDC  (~${(MAX_POSITION_PCT * 0.6 * 100).toFixed(0)}% of balance)
+Low confidence  : ${sizeLow.toFixed(2)} dUSDC  (~${(MIN_POSITION_PCT * 100).toFixed(0)}% of balance)
 
 STRIKE REFERENCE — use one of these exact values, do NOT use round numbers unless they appear here
 ATM            : $${atm}    ← preferred strike for directional positions
@@ -180,7 +191,8 @@ function parseDecision(raw: string, ctx: CycleContext): AllocationDecision {
   }
 
   // Safety rails — never let model exceed deployable budget
-  const maxDeploy  = ctx.balance_usdc * 0.7;
+  const maxDeploy   = ctx.balance_usdc * MAX_CYCLE_DEPLOY;
+  const minPosition = Math.max(1.0, ctx.balance_usdc * MIN_POSITION_PCT);
   // Hard cap: can only supply up to (max_plp - current_plp), never over the limit
   const plpHeadroom = Math.max(0, ctx.max_plp_usdc - ctx.current_plp_usdc);
   const supply      = Math.min(parsed.supply_usdc ?? 0, maxDeploy, plpHeadroom);
@@ -194,7 +206,9 @@ function parseDecision(raw: string, ctx: CycleContext): AllocationDecision {
   const positions: PositionAllocation[] = [];
   for (const p of (parsed.positions ?? [])) {
     if (spent >= maxDeploy) break;
-    const qty = Math.min(p.quantity_usdc ?? 0, maxDeploy - spent);
+    // Bump up any undersized position to the minimum, cap at remaining budget
+    const rawQty = p.quantity_usdc ?? 0;
+    const qty    = Math.min(Math.max(rawQty, minPosition), maxDeploy - spent);
     if (qty < 1.0) continue;
 
     // Validate strike fields

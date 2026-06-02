@@ -21,8 +21,17 @@ export const PLP_TYPE = `${PREDICT_PACKAGE}::plp::PLP`;
 // ── Vault policy ─────────────────────────────────────────────────────────────
 
 // Maximum dUSDC that may sit in PLP at any time.
-// Prevents hermes3 from locking the majority of capital as passive liquidity.
 export const MAX_PLP_DUSDC = 500;
+
+// Volatility thresholds — bypass hermes3 above these levels.
+// 15-30%: supply to PLP (wide spread = LP earns more); >30%: skip entirely.
+export const HIGH_VOL_THRESHOLD     = 15;   // vol% → supply only, no directional
+export const EXTREME_VOL_THRESHOLD  = 30;   // vol% → skip entirely
+
+// Position sizing as a fraction of total balance.
+export const MIN_POSITION_PCT   = 0.01;  // 1%  — floor enforced in parseDecision
+export const MAX_POSITION_PCT   = 0.05;  // 5%  — per-position ceiling
+export const MAX_CYCLE_DEPLOY   = 0.15;  // 15% — total per cycle (3 × 5%)
 
 // ── Scaling ──────────────────────────────────────────────────────────────────
 

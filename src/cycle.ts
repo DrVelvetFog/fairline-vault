@@ -16,13 +16,18 @@ import {
 } from './indexer.js';
 import { computeFeatures } from './features.js';
 import { decide, ping, AllocationDecision, CycleContext } from './model.js';
+
 import { predict as mlPredict, formatPrediction } from './ml-model.js';
 import {
   buildDepositAndMint, buildDepositAndMintRange, buildSupply,
 } from './transactions.js';
 import { getDusdcCoins, getPlpCoins, formatBalance } from './coins.js';
 import { execute, inspect, getAddress } from './wallet.js';
-import { MANAGER_ID, DUSDC_SCALE, MAX_PLP_DUSDC, humanToDusdc, PREDICT_PACKAGE } from './config.js';
+import {
+  MANAGER_ID, DUSDC_SCALE, MAX_PLP_DUSDC,
+  HIGH_VOL_THRESHOLD, EXTREME_VOL_THRESHOLD,
+  humanToDusdc, PREDICT_PACKAGE,
+} from './config.js';
 import * as fs from 'fs';
 
 const LIVE_MODE    = process.env.LIVE_MODE === 'true';
@@ -204,11 +209,43 @@ export async function runCycle(): Promise<void> {
   const mlPrediction = mlPredict(features);
   console.log(`ML model: ${formatPrediction(mlPrediction)}`);
 
-  // Pass ML signal to hermes3 — it will use it for direction, decide sizing itself
-  ctx.ml_prediction = mlPrediction;
+  // ── Vol guard — bypass hermes3 above volatility thresholds ─────────────────
+  const vol = features.realized_vol_pct;
+  const plpHeadroom = Math.max(0, MAX_PLP_DUSDC - currentPlp);
 
-  console.log('Asking hermes3…');
-  const decision = await decide(ctx);
+  let decision: AllocationDecision;
+
+  if (vol >= EXTREME_VOL_THRESHOLD) {
+    // Too volatile — market is a coin flip, ML signal unreliable, skip entirely
+    console.log(`  [vol-guard] ⚡ vol=${vol.toFixed(1)}% ≥ ${EXTREME_VOL_THRESHOLD}% — SKIP (too volatile)`);
+    decision = {
+      reasoning:   `Vol ${vol.toFixed(1)}% is extreme — ML signal unreliable, sitting out`,
+      supply_usdc: 0, positions: [], confidence: 'low',
+      skip: true, skip_reason: `extreme vol (${vol.toFixed(1)}%)`,
+    };
+  } else if (vol >= HIGH_VOL_THRESHOLD) {
+    // High vol — wide spread favours LP; supply to PLP if headroom, else skip
+    if (plpHeadroom >= 1) {
+      const supplyAmt = Math.min(plpHeadroom, totalH * 0.3);
+      console.log(`  [vol-guard] ⚡ vol=${vol.toFixed(1)}% ≥ ${HIGH_VOL_THRESHOLD}% — supplying ${supplyAmt.toFixed(1)} dUSDC to PLP (bypassing hermes3)`);
+      decision = {
+        reasoning:   `Vol ${vol.toFixed(1)}% is high — wide spread favours PLP, not direction`,
+        supply_usdc: supplyAmt, positions: [], confidence: 'medium', skip: false,
+      };
+    } else {
+      console.log(`  [vol-guard] ⚡ vol=${vol.toFixed(1)}% ≥ ${HIGH_VOL_THRESHOLD}% — PLP at cap, SKIP`);
+      decision = {
+        reasoning:   `Vol ${vol.toFixed(1)}% is high but PLP at cap — skipping`,
+        supply_usdc: 0, positions: [], confidence: 'low',
+        skip: true, skip_reason: `high vol + PLP full`,
+      };
+    }
+  } else {
+    // Normal vol — pass to hermes3 with ML signal
+    ctx.ml_prediction = mlPrediction;
+    console.log('Asking hermes3…');
+    decision = await decide(ctx);
+  }
 
   console.log(`\nDecision (${decision.confidence} confidence):`);
   console.log(`  ${decision.reasoning}`);
