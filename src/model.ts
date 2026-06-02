@@ -39,6 +39,8 @@ export interface CycleContext {
   realized_pnl:   number;             // cumulative realized P&L (human dUSDC)
   recent_history: string;             // summary of last N cycle outcomes
   ml_prediction?: MLPrediction;       // trained model signal (injected by cycle.ts)
+  current_plp_usdc: number;           // dUSDC currently locked in PLP
+  max_plp_usdc:     number;           // hard cap on PLP holdings
 }
 
 // ── Prompt builders ───────────────────────────────────────────────────────────
@@ -114,6 +116,7 @@ MANAGER STATE
 Balance        : ${ctx.balance_usdc.toFixed(6)} dUSDC
 Deployable     : ${deployable.toFixed(2)} dUSDC (70% of balance)
 Realized P&L   : ${ctx.realized_pnl >= 0 ? '+' : ''}${ctx.realized_pnl.toFixed(6)} dUSDC
+PLP locked     : ${ctx.current_plp_usdc.toFixed(2)} / ${ctx.max_plp_usdc} dUSDC max  ← DO NOT supply if already at cap
 
 STRIKE REFERENCE — use one of these exact values, do NOT use round numbers unless they appear here
 ATM            : $${atm}    ← preferred strike for directional positions
@@ -177,9 +180,16 @@ function parseDecision(raw: string, ctx: CycleContext): AllocationDecision {
   }
 
   // Safety rails — never let model exceed deployable budget
-  const maxDeploy = ctx.balance_usdc * 0.7;
-  const supply    = Math.min(parsed.supply_usdc ?? 0, maxDeploy);
-  let   spent     = supply;
+  const maxDeploy  = ctx.balance_usdc * 0.7;
+  // Hard cap: can only supply up to (max_plp - current_plp), never over the limit
+  const plpHeadroom = Math.max(0, ctx.max_plp_usdc - ctx.current_plp_usdc);
+  const supply      = Math.min(parsed.supply_usdc ?? 0, maxDeploy, plpHeadroom);
+  if ((parsed.supply_usdc ?? 0) > plpHeadroom && plpHeadroom < 1) {
+    console.log(`  [model] supply capped to 0 — PLP at limit (${ctx.current_plp_usdc.toFixed(0)}/${ctx.max_plp_usdc} dUSDC)`);
+  } else if ((parsed.supply_usdc ?? 0) > plpHeadroom) {
+    console.log(`  [model] supply capped: ${(parsed.supply_usdc ?? 0).toFixed(2)} → ${supply.toFixed(2)} dUSDC (PLP headroom: ${plpHeadroom.toFixed(2)})`);
+  }
+  let spent = supply;
 
   const positions: PositionAllocation[] = [];
   for (const p of (parsed.positions ?? [])) {

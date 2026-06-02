@@ -20,9 +20,9 @@ import { predict as mlPredict, formatPrediction } from './ml-model.js';
 import {
   buildDepositAndMint, buildDepositAndMintRange, buildSupply,
 } from './transactions.js';
-import { getDusdcCoins, formatBalance } from './coins.js';
+import { getDusdcCoins, getPlpCoins, formatBalance } from './coins.js';
 import { execute, inspect, getAddress } from './wallet.js';
-import { MANAGER_ID, DUSDC_SCALE, humanToDusdc, PREDICT_PACKAGE } from './config.js';
+import { MANAGER_ID, DUSDC_SCALE, MAX_PLP_DUSDC, humanToDusdc, PREDICT_PACKAGE } from './config.js';
 import * as fs from 'fs';
 
 const LIVE_MODE    = process.env.LIVE_MODE === 'true';
@@ -168,11 +168,12 @@ export async function runCycle(): Promise<void> {
     return;
   }
 
-  const [prices, latest, summary, dusdcBal] = await Promise.all([
+  const [prices, latest, summary, dusdcBal, plpCoins] = await Promise.all([
     getPriceHistory(oracle.oracle_id),
     getLatestPrice(oracle.oracle_id),
     getManagerSummary(MANAGER_ID),
     getDusdcCoins(address),
+    getPlpCoins(address),
   ]);
 
   const features    = computeFeatures(oracle, prices, latest);
@@ -181,18 +182,22 @@ export async function runCycle(): Promise<void> {
   // Total available = manager balance + wallet dUSDC (model works on combined)
   const totalH      = (managerBal + walletBal) / Number(DUSDC_SCALE);
   const pnlH        = summary.realized_pnl / Number(DUSDC_SCALE);
+  const currentPlp  = plpCoins.reduce((s, c) => s + Number(c.balance), 0) / Number(DUSDC_SCALE);
 
   console.log(`Spot: $${features.spot_usd.toFixed(2)}  Vol: ${features.realized_vol_pct.toFixed(2)}%  Trend: ${features.price_trend}`);
   console.log(`Wallet dUSDC : ${formatBalance(dusdcBal)}`);
   console.log(`Manager bal  : ${(managerBal / Number(DUSDC_SCALE)).toFixed(6)} dUSDC`);
+  console.log(`PLP locked   : ${currentPlp.toFixed(4)} / ${MAX_PLP_DUSDC} dUSDC max`);
   console.log(`Total avail  : ${totalH.toFixed(6)} dUSDC  |  PnL: ${pnlH >= 0 ? '+' : ''}${pnlH.toFixed(6)}`);
 
   // 3. Model decision
   const ctx: CycleContext = {
     features,
-    balance_usdc:   totalH,
-    realized_pnl:   pnlH,
-    recent_history: loadHistory(),
+    balance_usdc:     totalH,
+    realized_pnl:     pnlH,
+    recent_history:   loadHistory(),
+    current_plp_usdc: currentPlp,
+    max_plp_usdc:     MAX_PLP_DUSDC,
   };
 
   // Run trained ML model for directional signal

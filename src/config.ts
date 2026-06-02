@@ -18,6 +18,12 @@ export const DUSDC_DECIMALS    = 6;
 // PLP — liquidity provider token (same package as Predict)
 export const PLP_TYPE = `${PREDICT_PACKAGE}::plp::PLP`;
 
+// ── Vault policy ─────────────────────────────────────────────────────────────
+
+// Maximum dUSDC that may sit in PLP at any time.
+// Prevents hermes3 from locking the majority of capital as passive liquidity.
+export const MAX_PLP_DUSDC = 500;
+
 // ── Scaling ──────────────────────────────────────────────────────────────────
 
 // Oracle prices and strikes: 1e9 float scaling (DeepBook math convention)
