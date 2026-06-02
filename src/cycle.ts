@@ -252,5 +252,13 @@ export async function runCycle(): Promise<void> {
   console.log('━━━ done ━━━\n');
 }
 
-// CLI
-runCycle().catch(err => { console.error(err); process.exit(1); });
+// CLI — only run when invoked directly (not when imported as a module by watcher.ts)
+const isMain = process.argv[1] && (
+  process.argv[1].endsWith('cycle.ts') ||
+  process.argv[1].endsWith('cycle.js') ||
+  // tsx passes the real file path even through the loader
+  import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').pop()!)
+);
+if (isMain) {
+  runCycle().catch(err => { console.error(err); process.exit(1); });
+}

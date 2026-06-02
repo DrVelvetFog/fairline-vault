@@ -49,22 +49,28 @@ export function computeFeatures(
   // Use last 20 price events, oldest-first
   const window = prices.slice(-20).sort((a, b) => a.checkpoint_timestamp_ms - b.checkpoint_timestamp_ms);
 
-  // Realized vol from log returns of spot prices
+  // Realized vol from log returns of spot prices, using actual elapsed time
   let realizedVol = 0;
   if (window.length >= 2) {
     const logReturns: number[] = [];
+    let totalMs = 0;
     for (let i = 1; i < window.length; i++) {
-      const prev = priceToHuman(window[i - 1].spot);
-      const curr = priceToHuman(window[i].spot);
-      if (prev > 0 && curr > 0) logReturns.push(Math.log(curr / prev));
+      const prev    = priceToHuman(window[i - 1].spot);
+      const curr    = priceToHuman(window[i].spot);
+      const dtMs    = window[i].checkpoint_timestamp_ms - window[i - 1].checkpoint_timestamp_ms;
+      if (prev > 0 && curr > 0 && dtMs > 0) {
+        logReturns.push(Math.log(curr / prev));
+        totalMs += dtMs;
+      }
     }
-    if (logReturns.length > 0) {
-      const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
-      const variance = logReturns.reduce((a, r) => a + (r - mean) ** 2, 0) / logReturns.length;
-      const stdPerPeriod = Math.sqrt(variance);
-      // Approximate: each price event ~30s apart → 2/min → 2*60*24*365 per year
-      const periodsPerYear = 2 * 60 * 24 * 365;
-      realizedVol = stdPerPeriod * Math.sqrt(periodsPerYear) * 100;
+    if (logReturns.length > 0 && totalMs > 0) {
+      const mean           = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
+      const variance       = logReturns.reduce((a, r) => a + (r - mean) ** 2, 0) / logReturns.length;
+      const stdPerPeriod   = Math.sqrt(variance);
+      // Scale: avg period in years = (totalMs / logReturns.length) / msPerYear
+      const msPerYear      = 365 * 24 * 60 * 60 * 1000;
+      const avgPeriodYears = (totalMs / logReturns.length) / msPerYear;
+      realizedVol = avgPeriodYears > 0 ? (stdPerPeriod / Math.sqrt(avgPeriodYears)) * 100 : 0;
     }
   }
 

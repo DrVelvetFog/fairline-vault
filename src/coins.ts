@@ -8,7 +8,7 @@
 import { CoinStruct } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
 import { client } from './wallet.js';
-import { DUSDC_TYPE, DUSDC_SCALE, dusdcToHuman } from './config.js';
+import { DUSDC_TYPE, DUSDC_SCALE, PLP_TYPE, dusdcToHuman } from './config.js';
 
 export interface CoinBalance {
   coins:        CoinStruct[];
@@ -61,4 +61,10 @@ export function splitDusdc(
 /** Pretty-print coin balance for logging. */
 export function formatBalance(bal: CoinBalance): string {
   return `${bal.totalHuman.toFixed(6)} dUSDC (${bal.coins.length} coin object${bal.coins.length === 1 ? '' : 's'})`;
+}
+
+/** Fetch all PLP coin objects owned by an address. */
+export async function getPlpCoins(owner: string): Promise<CoinStruct[]> {
+  const result = await client.getCoins({ owner, coinType: PLP_TYPE });
+  return result.data;
 }

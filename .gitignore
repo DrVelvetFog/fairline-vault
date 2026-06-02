@@ -2,5 +2,17 @@ node_modules/
 dist/
 .env
 *.log
-logs/pm2-*.log
 .DS_Store
+
+# Live trade logs — grow indefinitely, contain real P&L/strategy history
+# simulation.json stays tracked (static backtest artifact)
+logs/cycles.jsonl
+logs/cycle-history.json
+logs/daily-summary.json
+logs/retrain-state.json
+
+# Claude Code session data — never commit
+.claude/
+
+# One-off utility scripts
+src/redeem-plp.ts

@@ -13,15 +13,18 @@
 import 'dotenv/config';
 import { runCycle } from './cycle.js';
 import { getSettledOracles, getManagerPositions, getManagerSummary } from './indexer.js';
-import { buildRedeemPermissionless } from './transactions.js';
+import { buildRedeemPermissionless, buildWithdrawLiquidity } from './transactions.js';
 import { execute, getAddress } from './wallet.js';
+import { getDusdcCoins, getPlpCoins } from './coins.js';
 import { MANAGER_ID, DUSDC_SCALE } from './config.js';
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 
-const POLL_INTERVAL_MS   = 60_000;  // 1 minute
-const RETRAIN_EVERY_N    = 50;      // retrain after this many new settled oracles
-const RETRAIN_STATE_FILE = 'logs/retrain-state.json';
+const POLL_INTERVAL_MS      = 60_000;  // 1 minute
+const RETRAIN_EVERY_N       = 20;      // retrain after this many new settled oracles (~5 hrs)
+const RETRAIN_MIN_HOURS     = 4;       // but never retrain more often than every 4 hours
+const RETRAIN_STATE_FILE    = 'logs/retrain-state.json';
+const MIN_WALLET_DUSDC      = 1_000;   // pull PLP back if wallet dUSDC drops below this
 
 // ── Retrain trigger ───────────────────────────────────────────────────────────
 
@@ -38,6 +41,15 @@ async function maybeRetrain(settledCount: number) {
   const state = loadRetrainState();
   const newSince = settledCount - state.last_count;
   if (newSince < RETRAIN_EVERY_N) return;
+
+  // Enforce minimum gap between retrains
+  if (state.last_retrain !== 'never') {
+    const hoursSinceLast = (Date.now() - new Date(state.last_retrain).getTime()) / 3_600_000;
+    if (hoursSinceLast < RETRAIN_MIN_HOURS) {
+      console.log(`[retrain] skipping — last retrain ${hoursSinceLast.toFixed(1)}h ago (min ${RETRAIN_MIN_HOURS}h)`);
+      return;
+    }
+  }
 
   console.log(`\n[retrain] ${newSince} new oracles since last retrain — retraining…`);
   const proc = child_process.spawnSync('python3', ['scripts/retrain.py'], {
@@ -86,6 +98,41 @@ async function autoRedeem(): Promise<number> {
   return redeemed;
 }
 
+// ── Auto-withdraw PLP when wallet dUSDC is low ────────────────────────────────
+
+async function autoPLPWithdraw(): Promise<void> {
+  const address = getAddress();
+
+  // Check wallet dUSDC — if we have plenty, nothing to do
+  const dusdcBal = await getDusdcCoins(address);
+  if (dusdcBal.totalHuman >= MIN_WALLET_DUSDC) return;
+
+  // Check for PLP coins
+  const plpCoins = await getPlpCoins(address);
+  if (plpCoins.length === 0) return;
+
+  const totalPlp = plpCoins.reduce((s, c) => s + Number(c.balance), 0) / 1e6;
+  console.log(`  [plp-withdraw] Wallet dUSDC low (${dusdcBal.totalHuman.toFixed(2)}) — withdrawing ${totalPlp.toFixed(4)} PLP → dUSDC`);
+
+  let withdrawn = 0;
+  for (const plp of plpCoins) {
+    try {
+      const tx     = buildWithdrawLiquidity(plp.coinObjectId, address);
+      const result = await execute(tx);
+      const plpAmt = (Number(plp.balance) / 1e6).toFixed(4);
+      console.log(`  [plp-withdraw] ✓ ${plpAmt} PLP redeemed → ${result.digest}`);
+      withdrawn++;
+    } catch (e) {
+      console.error(`  [plp-withdraw] ❌ ${String(e).slice(0, 120)}`);
+    }
+  }
+
+  if (withdrawn > 0) {
+    const newBal = await getDusdcCoins(address);
+    console.log(`  [plp-withdraw] Wallet dUSDC now: ${newBal.totalHuman.toFixed(4)}`);
+  }
+}
+
 // ── Main tick ─────────────────────────────────────────────────────────────────
 
 async function tick() {
@@ -102,11 +149,14 @@ async function tick() {
       console.log(`  Balance: ${bal.toFixed(4)} dUSDC  |  Realized P&L: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} dUSDC`);
     }
 
-    // 2. Check if retrain is due
+    // 2. Pull PLP back to dUSDC if wallet balance is running low
+    await autoPLPWithdraw();
+
+    // 3. Check if retrain is due
     const settled = await getSettledOracles();
     await maybeRetrain(settled.length);
 
-    // 3. Run allocation cycle (has built-in "already entered" guard)
+    // 4. Run allocation cycle (has built-in "already entered" guard)
     await runCycle();
 
   } catch (e) {

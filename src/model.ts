@@ -96,7 +96,7 @@ function buildUserPrompt(ctx: CycleContext): string {
   const atm = Math.round(f.spot_usd);
 
   const mlLine = ctx.ml_prediction
-    ? `\nML MODEL SIGNAL  : ${formatPrediction(ctx.ml_prediction)} — trust this signal, it has 59.1% cross-validated accuracy`
+    ? `\nML MODEL SIGNAL  : ${formatPrediction(ctx.ml_prediction)} — trust this signal, it has ${(ctx.ml_prediction.cv_accuracy * 100).toFixed(1)}% cross-validated accuracy`
     : '';
 
   return `MARKET STATE — ${new Date().toISOString()}${mlLine}
@@ -104,9 +104,10 @@ Asset          : ${f.underlying}
 Spot           : $${f.spot_usd.toFixed(2)}
 Forward        : $${f.forward_usd.toFixed(2)}
 Time to expiry : ${f.time_to_expiry_min.toFixed(1)} minutes
-Realized vol   : ${f.realized_vol_pct.toFixed(2)}% annualized
+Realized vol   : ${f.realized_vol_pct.toFixed(2)}% annualized  ← USE THIS EXACT NUMBER in your reasoning
 Price trend    : ${f.price_trend} (${f.price_change_pct > 0 ? '+' : ''}${f.price_change_pct.toFixed(4)}% over last ${f.n_prices} prices)
-Range (window) : $${f.price_low_usd.toFixed(2)} – $${f.price_high_usd.toFixed(2)}
+Momentum       : ${f.momentum_pct.toFixed(4)}% (2nd half vs 1st half of window)
+Range (window) : $${f.price_low_usd.toFixed(2)} – $${f.price_high_usd.toFixed(2)} (${f.range_pct.toFixed(4)}% of spot)
 Basis          : ${f.basis_bps.toFixed(1)} bps (forward vs spot)
 
 MANAGER STATE
@@ -114,8 +115,8 @@ Balance        : ${ctx.balance_usdc.toFixed(6)} dUSDC
 Deployable     : ${deployable.toFixed(2)} dUSDC (70% of balance)
 Realized P&L   : ${ctx.realized_pnl >= 0 ? '+' : ''}${ctx.realized_pnl.toFixed(6)} dUSDC
 
-STRIKE REFERENCE (nearest whole dollars to spot)
-ATM            : $${atm}
+STRIKE REFERENCE — use one of these exact values, do NOT use round numbers unless they appear here
+ATM            : $${atm}    ← preferred strike for directional positions
 ATM-1          : $${atm - 1}
 ATM+1          : $${atm + 1}
 ATM-5          : $${atm - 5}
@@ -124,7 +125,7 @@ ATM+5          : $${atm + 5}
 RECENT CYCLE HISTORY
 ${ctx.recent_history || 'No prior cycles this session.'}
 
-Decide the allocation for this cycle. Remember: skip if < 3 min to expiry or balance < 2 dUSDC.`;
+Decide the allocation for this cycle. IMPORTANT: use the exact vol/trend numbers above in your reasoning. Skip if < 3 min to expiry or balance < 2 dUSDC. For directional positions use strikes from the STRIKE REFERENCE above.`;
 }
 
 // ── Ollama call ───────────────────────────────────────────────────────────────
@@ -191,7 +192,20 @@ function parseDecision(raw: string, ctx: CycleContext): AllocationDecision {
     if (p.type === 'range' && (!p.lower_strike || !p.higher_strike)) continue;
     if (p.type === 'range' && p.lower_strike! >= p.higher_strike!) continue;
 
-    positions.push({ ...p, quantity_usdc: qty });
+    // Snap wildly OTM strikes back to ATM (>2% from spot is likely a model error)
+    const spot = ctx.features.spot_usd;
+    const atm  = Math.round(spot);
+    const MAX_STRIKE_DRIFT = 0.02;  // 2% of spot
+    let   correctedPos = { ...p, quantity_usdc: qty };
+    if ((p.type === 'up' || p.type === 'down') && p.strike) {
+      const drift = Math.abs(p.strike - spot) / spot;
+      if (drift > MAX_STRIKE_DRIFT) {
+        console.log(`  [model] strike $${p.strike} is ${(drift * 100).toFixed(1)}% from spot — snapping to ATM $${atm}`);
+        correctedPos = { ...correctedPos, strike: atm };
+      }
+    }
+
+    positions.push(correctedPos);
     spent += qty;
   }
 
