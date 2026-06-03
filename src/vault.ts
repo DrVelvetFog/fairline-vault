@@ -14,9 +14,40 @@ import { client } from './wallet.js';
 import { splitDusdc } from './coins.js';
 import {
   VAULT_PACKAGE, VAULT_OBJECT, VAULT_ADMIN_CAP, DUSDC_TYPE, DUSDC_SCALE,
+  PREDICT_PACKAGE, PREDICT_OBJECT,
 } from './config.js';
 
 const MOD = `${VAULT_PACKAGE}::vault`;
+const CLOCK = '0x6';
+
+/**
+ * Operator: deploy `amountRaw` of vault reserve directly into DeepBook Predict
+ * PLP in one atomic PTB (vault.deploy → predict.supply → PLP to operator).
+ */
+export function buildVaultDeployToPlp(amountRaw: bigint, sender: string): Transaction {
+  const tx = new Transaction();
+  const coin = tx.moveCall({
+    target: `${MOD}::deploy`,
+    typeArguments: [DUSDC_TYPE],
+    arguments: [tx.object(VAULT_ADMIN_CAP), tx.object(VAULT_OBJECT), tx.pure.u64(amountRaw)],
+  });
+  const plp = tx.moveCall({
+    target: `${PREDICT_PACKAGE}::predict::supply`,
+    typeArguments: [DUSDC_TYPE],
+    arguments: [tx.object(PREDICT_OBJECT), coin, tx.object(CLOCK)],
+  });
+  tx.transferObjects([plp], sender);
+  return tx;
+}
+
+/** Current PLP redemption rate (dUSDC per PLP) from the on-chain Predict object. */
+export async function getPlpRate(): Promise<number> {
+  const o = await client.getObject({ id: PREDICT_OBJECT, options: { showContent: true } });
+  const f: any = (o.data?.content as any)?.fields ?? {};
+  const reserves = Number(BigInt(f.vault?.fields?.balance ?? 0));
+  const supply = Number(BigInt(f.treasury_cap?.fields?.total_supply?.fields?.value ?? 0));
+  return supply > 0 ? reserves / supply : 1;
+}
 
 /** Deposit `amountRaw` dUSDC into the vault; FLP shares are returned to `sender`. */
 export function buildVaultDeposit(coins: CoinStruct[], amountRaw: bigint, sender: string): Transaction {

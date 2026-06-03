@@ -21,7 +21,9 @@
     "retrain": "python3 scripts/retrain.py",
     "build": "tsc",
     "start": "node dist/index.js",
-    "lp-supply": "tsx src/lp-supply.ts"
+    "lp-supply": "tsx src/lp-supply.ts",
+    "vault-deploy": "tsx src/vault-strategy.ts deploy",
+    "vault-mark": "tsx src/vault-strategy.ts mark"
   },
   "dependencies": {
     "@mysten/sui": "^1.45.2",
