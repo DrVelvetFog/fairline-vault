@@ -12,11 +12,11 @@ const ROOT = process.cwd();
 import * as child_process from 'child_process';
 import {
   getNearestActiveOracle, getFutureOracles, getLatestPrice, getManagerSummary,
-  getPriceHistory,
+  getPriceHistory, PriceEvent,
 } from './indexer.js';
-import { getDusdcCoins } from './coins.js';
+import { getDusdcCoins, getPlpCoins } from './coins.js';
 import { getAddress, client } from './wallet.js';
-import { MANAGER_ID, DUSDC_SCALE, priceToHuman } from './config.js';
+import { MANAGER_ID, DUSDC_SCALE, priceToHuman, PREDICT_OBJECT } from './config.js';
 import { computeFeatures } from './features.js';
 
 const PORT         = parseInt(process.env.DASHBOARD_PORT ?? '3002', 10);
@@ -26,7 +26,7 @@ const MODEL_STATS  = path.join(ROOT, 'scripts/model_stats.json');
 const RETRAIN_STATE = path.join(ROOT, 'logs/retrain-state.json');
 
 // ── Price history cache (30s TTL — avoids 3s RPC call on every refresh) ──────
-const priceCache = new Map<string, { data: unknown[]; ts: number }>();
+const priceCache = new Map<string, { data: PriceEvent[]; ts: number }>();
 async function getCachedPriceHistory(oracleId: string) {
   const cached = priceCache.get(oracleId);
   if (cached && Date.now() - cached.ts < 30_000) return cached.data;
@@ -107,6 +107,43 @@ app.get('/api/vault', async (_req: Request, res: Response) => {
       sui_balance:  Number(sui.totalBalance) / 1e9,
       dusdc_wallet: Number(dusdc.totalRaw) / Number(DUSDC_SCALE),
       manager:      summary,
+    });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// ── Liquidity provision (PLP) state ───────────────────────────────────────────
+// Reads the on-chain vault reserves + PLP supply to compute the redemption rate
+// (the realized house edge), plus this wallet's PLP holdings and the latest LP
+// engine decision from the cycle log.
+app.get('/api/plp', async (_req: Request, res: Response) => {
+  try {
+    const address = getAddress();
+    const [predictObj, plpCoins] = await Promise.all([
+      client.getObject({ id: PREDICT_OBJECT, options: { showContent: true } }),
+      getPlpCoins(address),
+    ]);
+
+    const f: any = (predictObj.data?.content as any)?.fields ?? {};
+    const reservesRaw = BigInt(f.vault?.fields?.balance ?? 0);
+    const plpSupplyRaw = BigInt(f.treasury_cap?.fields?.total_supply?.fields?.value ?? 0);
+    const mtmRaw       = BigInt(f.vault?.fields?.total_mtm ?? 0);
+    const rate = plpSupplyRaw > 0n ? Number(reservesRaw) / Number(plpSupplyRaw) : 1;
+
+    const heldRaw = plpCoins.reduce((s, c) => s + BigInt(c.balance), 0n);
+    const heldValueDusdc = Number(heldRaw) * rate / Number(DUSDC_SCALE);
+
+    // Latest LP engine decision from the cycle log
+    const latest = readCycles(1)[0];
+    const lp = latest?.lp ?? null;
+
+    res.json({
+      redemption_rate:  rate,
+      house_edge_pct:   (rate - 1) * 100,
+      reserves_dusdc:   Number(reservesRaw) / Number(DUSDC_SCALE),
+      open_liability_dusdc: Number(mtmRaw) / Number(DUSDC_SCALE),
+      plp_held:         Number(heldRaw) / Number(DUSDC_SCALE),
+      plp_value_dusdc:  heldValueDusdc,
+      lp_engine:        lp,   // { factor, target, current, delta, action }
     });
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
@@ -277,11 +314,11 @@ button:disabled{opacity:.5;cursor:not-allowed}
 </header>
 
 <div class="metrics">
-  <div class="metric"><div class="lbl">Win Rate</div><div class="val" id="m-winrate">—</div><div class="sub" id="m-winrate-sub">— cycles</div></div>
-  <div class="metric"><div class="lbl">Total P&amp;L</div><div class="val" id="m-pnl">—</div><div class="sub">dUSDC simulated</div></div>
-  <div class="metric"><div class="lbl">Max Drawdown</div><div class="val" id="m-dd">—</div><div class="sub">peak-to-trough</div></div>
-  <div class="metric"><div class="lbl">Period Return</div><div class="val" id="m-apy">—</div><div class="sub" id="m-apy-sub">over backtest window</div></div>
-  <div class="metric"><div class="lbl">Manager Balance</div><div class="val" id="m-bal">—</div><div class="sub">dUSDC</div></div>
+  <div class="metric"><div class="lbl">Win Rate</div><div class="val" id="m-winrate">—</div><div class="sub" id="m-winrate-sub">live trades</div></div>
+  <div class="metric"><div class="lbl">Sleeve Net P&amp;L</div><div class="val" id="m-pnl">—</div><div class="sub">directional (experimental)</div></div>
+  <div class="metric"><div class="lbl">Completed Trades</div><div class="val" id="m-dd">—</div><div class="sub" id="m-dd-sub">W / L</div></div>
+  <div class="metric"><div class="lbl">Open Positions</div><div class="val" id="m-apy">—</div><div class="sub" id="m-apy-sub">awaiting settlement</div></div>
+  <div class="metric"><div class="lbl">Total Capital</div><div class="val" id="m-bal">—</div><div class="sub">wallet + manager dUSDC</div></div>
   <div class="metric"><div class="lbl">Active Markets</div><div class="val" id="m-markets">—</div><div class="sub">BTC oracles live</div></div>
 </div>
 
@@ -366,6 +403,29 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
   <!-- Right: Simulation results -->
   <div>
+    <div class="card" style="border-color:var(--green)">
+      <h2>💧 Liquidity Provision <span style="font-size:10px;color:var(--green)">PRIMARY</span></h2>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--muted)">PLP position</span><span id="lp-position">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--muted)">Redemption rate</span><span id="lp-rate">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--muted)">House edge (LP gain)</span><span id="lp-edge">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--muted)">Exposure factor → target</span><span id="lp-factor">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0">
+        <span style="color:var(--muted)">Last LP action</span><span id="lp-action">—</span>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--muted);line-height:1.6">
+        Vault reserves <span id="lp-reserves">—</span> · open liability <span id="lp-liability">—</span>.
+        FairLine earns the vault's spread as the house; ML/vol signal gates exposure against directional risk.
+      </div>
+    </div>
+
     <div class="card">
       <h2>Simulation Results</h2>
       <div id="sim-period" style="font-size:10px;color:var(--muted);margin-bottom:10px">—</div>
@@ -404,7 +464,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
     </div>
 
     <div class="card">
-      <h2>Live Trading Results (testnet)</h2>
+      <h2>Directional Sleeve <span style="font-size:10px;color:var(--yellow)">EXPERIMENTAL</span></h2>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Small capped research sleeve — full on-chain P&amp;L, reported honestly. Not the primary income strategy.</div>
       <div id="live-results" style="font-size:12px">Loading…</div>
     </div>
 
@@ -486,13 +547,10 @@ async function loadVault(){
   document.getElementById('w-mgr').textContent=(mgrBal/1e6).toFixed(6)+' dUSDC';
   document.getElementById('w-addr').textContent=d.address;
 
-  // Metrics
+  // Metrics — total capital (wallet + manager, excluding PLP)
   const total=(d.dusdc_wallet+(mgrBal/1e6));
-  document.getElementById('m-bal').textContent=total.toFixed(4);
-  if(d.manager){
-    const pnl=d.manager.realized_pnl/1e6;
-    document.getElementById('m-bal').style.color=total>0?'var(--green)':'var(--red)';
-  }
+  document.getElementById('m-bal').textContent=total.toFixed(2);
+  document.getElementById('m-bal').style.color='var(--green)';
 }
 
 // ── Cycles ───────────────────────────────────────────────────────────────────
@@ -554,18 +612,7 @@ async function loadSim(){
   document.getElementById('sim-period').textContent=
     cfg.n_oracles+' oracles · '+cfg.period_start.slice(0,10)+' → '+cfg.period_end.slice(0,10);
 
-  // Metrics bar
-  document.getElementById('m-winrate').textContent=(fl.win_rate*100).toFixed(1)+'%';
-  document.getElementById('m-winrate').style.color=fl.win_rate>0.5?'var(--green)':'var(--red)';
-  document.getElementById('m-winrate-sub').textContent=fl.wins+'W / '+fl.losses+'L';
-  document.getElementById('m-pnl').textContent=(fl.total_pnl>=0?'+':'')+fl.total_pnl.toFixed(2);
-  document.getElementById('m-pnl').style.color=fl.total_pnl>=0?'var(--green)':'var(--red)';
-  document.getElementById('m-dd').textContent=(fl.max_drawdown*100).toFixed(1)+'%';
-  document.getElementById('m-dd').style.color=fl.max_drawdown>0.2?'var(--red)':'var(--yellow)';
   const simHours=(cfg.n_oracles*15/60).toFixed(0);
-  document.getElementById('m-apy').textContent=(fl.total_return*100>=0?'+':'')+(fl.total_return*100).toFixed(1)+'%';
-  document.getElementById('m-apy').style.color=fl.total_return>=0?'var(--green)':'var(--red)';
-  document.getElementById('m-apy-sub').textContent='over '+simHours+'hr backtest ('+cfg.n_oracles+' oracles)';
 
   // Strategy bars (normalize to ±50% range)
   function barWidth(ret){return Math.min(Math.abs(ret*100),100).toFixed(0)+'%';}
@@ -696,6 +743,21 @@ async function loadModelStats(){
 async function loadLiveResults(){
   try{
     const d=await api('/api/summary');
+
+    // ── Drive top metrics bar from live data ──────────────────────────────────
+    if(d&&d.total_trades>0){
+      const wr=d.overall_win_rate*100;
+      document.getElementById('m-winrate').textContent=wr.toFixed(1)+'%';
+      document.getElementById('m-winrate').style.color=wr>=51.5?'var(--green)':'var(--red)';
+      document.getElementById('m-winrate-sub').textContent=d.total_trades+' live trades';
+      document.getElementById('m-pnl').textContent=(d.net_pnl>=0?'+':'')+d.net_pnl.toFixed(3);
+      document.getElementById('m-pnl').style.color=d.net_pnl>=0?'var(--green)':'var(--red)';
+      document.getElementById('m-dd').textContent=d.total_trades;
+      document.getElementById('m-dd-sub').textContent=d.total_wins+'W / '+d.total_losses+'L';
+      document.getElementById('m-apy').textContent=d.open_positions;
+      document.getElementById('m-apy-sub').textContent='awaiting settlement';
+    }
+
     if(!d||d.total_trades===0){document.getElementById('live-results').innerHTML='<div style="color:var(--muted)">No completed trades yet — first results appear after a position settles.</div>';return;}
     const wr=(d.overall_win_rate*100);
     const wrColor=wr>=51.5?'var(--green)':'var(--red)';
@@ -716,9 +778,29 @@ async function loadLiveResults(){
   }catch(e){document.getElementById('live-results').textContent='Error: '+e.message;}
 }
 
+async function loadPlp(){
+  try{
+    const d=await api('/api/plp');
+    const held=d.plp_value_dusdc||0;
+    document.getElementById('lp-position').textContent=held.toFixed(2)+' dUSDC'+(d.plp_held>0?' ('+d.plp_held.toFixed(2)+' PLP)':'');
+    document.getElementById('lp-position').style.color=held>0?'var(--green)':'var(--muted)';
+    document.getElementById('lp-rate').textContent=d.redemption_rate.toFixed(6);
+    document.getElementById('lp-edge').textContent=(d.house_edge_pct>=0?'+':'')+d.house_edge_pct.toFixed(4)+'%';
+    document.getElementById('lp-edge').style.color=d.house_edge_pct>=0?'var(--green)':'var(--red)';
+    if(d.lp_engine){
+      document.getElementById('lp-factor').textContent=d.lp_engine.factor.toFixed(2)+' → '+d.lp_engine.target.toFixed(0)+' dUSDC';
+      const act=d.lp_engine.action;
+      document.getElementById('lp-action').textContent=act;
+      document.getElementById('lp-action').style.color=act==='supply'?'var(--green)':act==='pullback'?'var(--red)':'var(--muted)';
+    }
+    document.getElementById('lp-reserves').textContent=(d.reserves_dusdc/1e6).toFixed(2)+'M dUSDC';
+    document.getElementById('lp-liability').textContent=d.open_liability_dusdc.toFixed(0)+' dUSDC';
+  }catch(e){}
+}
+
 async function loadAll(){
   document.getElementById('hd-time').textContent=new Date().toLocaleTimeString();
-  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadSim(),loadModelStats(),loadLiveResults()]);
+  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadSim(),loadModelStats(),loadLiveResults(),loadPlp()]);
 }
 
 loadAll();
