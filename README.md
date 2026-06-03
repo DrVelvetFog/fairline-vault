@@ -42,6 +42,21 @@ The open liability being ~0.09% of reserves is *why* FairLine uses **sticky liqu
 
 ---
 
+## Multi-user vault (on-chain)
+
+FairLine has its own Move contract — a **NAV-based share vault** published to testnet. Anyone can deposit dUSDC and receive fungible **FLP** share tokens priced at the vault's net asset value; withdrawals burn shares for a pro-rata claim. The operator runs the LP strategy on the pooled capital (`deploy` → PLP, `mark`/`settle` NAV back), so depositors earn the house edge without running anything.
+
+```
+deposit (user)      dUSDC → FLP shares at NAV
+withdraw (user)     FLP   → dUSDC, pro-rata
+deploy (operator)   move idle reserve into PLP (the house)
+mark / settle       report/realize deployed value → moves share price
+```
+
+Verified live on testnet: deposit (`GGFyppXc…`) → deploy-to-PLP (`7J1oNLrk…`) → NAV mark (`FvtUkRNJ…`). NAV = idle reserve + deployed value (verifiable from the on-chain PLP rate); share price = NAV / FLP supply.
+
+> **Security & status:** testnet, single-operator, **unaudited** (we never claim otherwise). The contract passed an internal security review; the main limitation is operator trust around NAV reporting. See [`ROADMAP.md`](./ROADMAP.md) for the hardening + mainnet path. DeepBook Predict is testnet-only today, so mainnet is upstream-blocked.
+
 ## Stack
 
 - **Sui SDK** `@mysten/sui` — PTB construction, transaction execution, devInspect previews
@@ -135,6 +150,8 @@ src/
 ├── wallet.ts          # Sign, execute, devInspect
 ├── cycle.ts           # LP engine (primary) + directional sleeve (secondary)
 ├── watcher.ts         # Autonomous 60s loop
+├── vault.ts           # FairLine Vault PTB builders + state reads
+├── vault-strategy.ts  # Operator: deploy vault reserve → PLP, mark NAV
 ├── lp-supply.ts       # Manual LP supply (devInspect-then-execute)
 ├── daily-summary.ts   # Hourly P&L summary
 ├── simulate.ts        # Backtest engine
@@ -142,6 +159,8 @@ src/
 logs/
 ├── cycles.jsonl       # Per-cycle log (LP factor, target, action, digests)
 └── daily-summary.json # Rolling P&L summary
+contracts/fairline_vault/
+└── sources/vault.move # Multi-user NAV share vault (Move) + unit tests
 ```
 
 ---
@@ -155,6 +174,9 @@ logs/
 | Registry | `0x43af14fed5480c20ff77e2263d5f794c35b9fab7e2212903127062f4fe2a6e64` |
 | dUSDC | `0xe95040085976bfd54a1a07225cd46c8a2b4e8e2b6732f140a0fc49850ba73e1a::dusdc::DUSDC` |
 | PLP | `0xf5ea2b...::plp::PLP` |
+| **FairLine Vault package** | `0xfe5abfde639a8ea1a208808578f1c7f79f4aa94cf15a77f169cdc8f3d8c0ccfb` |
+| **FairLine Vault\<dUSDC\>** (shared) | `0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e` |
+| **FLP share token** | `0xfe5abf...::vault::VAULT` |
 
 ---
 

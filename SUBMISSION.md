@@ -58,6 +58,13 @@ model becomes a useful risk model.
 - **Capped experimental directional sleeve.** Directional trading survives as a
   small, hard-capped (≤15 dUSDC/position, ≤45/cycle) research sleeve, only in
   calm regimes with high model confidence. Its full P&L is reported honestly.
+- **Multi-user share vault (our own Move contract, live on testnet).** Anyone
+  deposits dUSDC and receives fungible FLP shares priced at NAV; withdraws
+  pro-rata. The operator runs the LP strategy on the pooled capital. This turns
+  FairLine from a single bot into a **product with depositors and real TVL** —
+  deposit → deploy to PLP → earn the house edge → share price rises. Verified
+  end to end on-chain (deposit `GGFyppXc…`, deploy-to-PLP `7J1oNLrk…`, NAV mark
+  `FvtUkRNJ…`).
 
 ## Verifiable on-chain facts (testnet, at time of writing)
 
@@ -82,6 +89,10 @@ Representative live LP supply transactions:
 
 ## Technical implementation
 
+- **Our own Move contract:** a NAV-based multi-user share vault (`fairline_vault`)
+  published to testnet — deposit/withdraw/deploy/settle, fungible FLP shares,
+  passing unit tests, internal security review. Composes atomically with Predict
+  (one PTB: `vault.deploy` → `predict.supply`).
 - **Meaningful Sui/DeepBook integration:** PTBs for `supply`, atomic
   `withdraw`→`supply` straight from the PredictManager, mint-from-Manager-balance,
   and `get_trade_amounts` devInspect pricing previews — all against the live
