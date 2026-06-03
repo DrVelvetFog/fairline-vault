@@ -195,92 +195,117 @@ const HTML = /* html */`<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FairLine — DeepBook Predict Vault</title>
 <style>
-:root{--bg:#0d1117;--surf:#161b22;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--green:#3fb950;--blue:#58a6ff;--yellow:#d29922;--red:#f85149;--purple:#bc8cff;--teal:#39d353}
+:root{
+  --bg:#0a0e14;--bg2:#0d1219;--surf:#141a23;--surf2:#1a212b;--border:#262e3a;
+  --text:#e8eef5;--muted:#7d8896;--faint:#4a5563;
+  --green:#3fd77a;--green-dim:#1a7a44;--blue:#5b9dff;--amber:#e0a93c;--red:#ff5d52;--teal:#2dd4bf;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'SF Mono','JetBrains Mono','Cascadia Code','Fira Code',ui-monospace,monospace;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'SF Mono','Cascadia Code','Fira Code',monospace;font-size:13px;line-height:1.5;min-height:100vh}
-h2{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+body{
+  background:radial-gradient(1200px 600px at 80% -10%,#10202b 0%,transparent 60%),var(--bg);
+  color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:var(--mono)}
+h2{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.tag{font-size:9px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:5px}
+.tag-primary{background:rgba(63,215,122,.14);color:var(--green)}
+.tag-exp{background:rgba(224,169,60,.14);color:var(--amber)}
 
 /* Header */
-header{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
-.header-left{display:flex;align-items:center;gap:16px}
-.logo{font-size:16px;font-weight:700;color:var(--text)}
-.logo span{color:var(--blue)}
-#hd-spot{font-size:18px;font-weight:700;color:var(--green)}
+header{background:rgba(13,18,25,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.header-left{display:flex;align-items:center;gap:18px}
+.logo{font-size:17px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:11px}
+.logo span{color:var(--green)}
+#hd-spot{font-size:19px;font-weight:700;color:var(--text);font-family:var(--mono)}
 #hd-expiry{font-size:11px;color:var(--muted)}
-.header-right{display:flex;align-items:center;gap:12px;font-size:11px;color:var(--muted)}
+.header-right{display:flex;align-items:center;gap:14px;font-size:11px;color:var(--muted)}
 
 /* Metrics bar */
-.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:16px 20px;border-bottom:1px solid var(--border)}
-.metric{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
-.metric .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
-.metric .val{font-size:22px;font-weight:700}
-.metric .sub{font-size:10px;color:var(--muted);margin-top:2px}
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;padding:20px 24px 6px}
+.metric{background:linear-gradient(180deg,var(--surf2),var(--surf));border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden}
+.metric.hero{border-color:rgba(63,215,122,.35);box-shadow:0 0 0 1px rgba(63,215,122,.08),0 8px 24px -12px rgba(63,215,122,.3)}
+.metric.hero::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(63,215,122,.07),transparent 70%);pointer-events:none}
+.metric .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.metric .val{font-size:23px;font-weight:700;font-family:var(--mono);letter-spacing:-.02em;line-height:1.1}
+.metric .sub{font-size:10px;color:var(--faint);margin-top:4px}
 
 /* Main grid */
-main{display:grid;grid-template-columns:280px 1fr 300px;gap:14px;padding:16px 20px;align-items:start}
+main{display:grid;grid-template-columns:300px 1fr 320px;gap:16px;padding:16px 24px 28px;align-items:start}
 
 /* Cards */
-.card{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:14px}
-.card+.card{margin-top:12px}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.card+.card{margin-top:14px}
+.card.glow{border-color:rgba(63,215,122,.3);background:linear-gradient(180deg,rgba(63,215,122,.04),var(--surf))}
+.row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+.row .k{color:var(--muted);font-size:12px}
+.row .v{font-family:var(--mono);font-weight:600;font-size:12.5px}
+.note{font-size:10.5px;color:var(--faint);line-height:1.6;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+
+/* Big stat (hero LP) */
+.bigstat{display:flex;align-items:baseline;gap:8px;margin:2px 0 14px}
+.bigstat .num{font-family:var(--mono);font-size:34px;font-weight:700;color:var(--green);letter-spacing:-.02em}
+.bigstat .unit{font-size:13px;color:var(--muted)}
+
+/* Allocation bar */
+.allocbar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--bg);margin:4px 0 8px;border:1px solid var(--border)}
+.allocbar>span{height:100%;transition:width .6s ease}
+.alloclegend{display:flex;gap:14px;font-size:10.5px;color:var(--muted);flex-wrap:wrap}
+.alloclegend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:middle}
 
 /* Status dot */
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
-.dot-green{background:var(--green);box-shadow:0 0 5px var(--green)}
-.dot-yellow{background:var(--yellow)}
-.dot-red{background:var(--red);box-shadow:0 0 5px var(--red)}
+.dot-green{background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot-yellow{background:var(--amber)}
+.dot-red{background:var(--red);box-shadow:0 0 6px var(--red)}
 .dot-grey{background:var(--muted)}
 
 /* Reasoning box */
-.reasoning-box{background:var(--bg);border-radius:6px;padding:12px;font-size:12px;line-height:1.7;color:#cdd9e5;border-left:3px solid var(--blue);min-height:60px}
+.reasoning-box{background:var(--bg);border-radius:8px;padding:13px 15px;font-size:12.5px;line-height:1.7;color:#cdd9e5;border-left:3px solid var(--green);min-height:48px}
 
 /* Position chips */
-.positions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.pos-chip{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
-.pos-up{background:#1a3a1a;color:var(--green);border:1px solid var(--green)}
-.pos-down{background:#3d1014;color:var(--red);border:1px solid var(--red)}
-.pos-range{background:#1a2a3a;color:var(--blue);border:1px solid var(--blue)}
-.pos-supply{background:#2a1a3a;color:var(--purple);border:1px solid var(--purple)}
-.pos-skip{background:#1c2128;color:var(--muted);border:1px solid var(--border)}
+.positions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.pos-chip{padding:5px 11px;border-radius:8px;font-size:11px;font-weight:600;font-family:var(--mono)}
+.pos-up{background:rgba(63,215,122,.12);color:var(--green);border:1px solid rgba(63,215,122,.4)}
+.pos-down{background:rgba(255,93,82,.1);color:var(--red);border:1px solid rgba(255,93,82,.4)}
+.pos-range{background:rgba(91,157,255,.1);color:var(--blue);border:1px solid rgba(91,157,255,.4)}
+.pos-supply{background:rgba(45,212,191,.1);color:var(--teal);border:1px solid rgba(45,212,191,.4)}
+.pos-skip{background:var(--surf2);color:var(--muted);border:1px solid var(--border)}
 
 /* Strike grid */
-.strike-grid{font-size:12px}
-.strike-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d}
+.strike-grid{font-size:12px;font-family:var(--mono)}
+.strike-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)}
 .strike-row:last-child{border-bottom:none}
-.strike-atm{color:var(--yellow);font-weight:700}
+.strike-atm{color:var(--amber);font-weight:700}
 
 /* Cycles table */
 table{width:100%;border-collapse:collapse;font-size:11px}
-th{text-align:left;color:var(--muted);font-weight:500;padding:4px 6px;border-bottom:1px solid var(--border)}
-td{padding:4px 6px;border-bottom:1px solid #21262d}
+th{text-align:left;color:var(--muted);font-weight:500;padding:6px 6px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;font-size:10px}
+td{padding:6px 6px;border-bottom:1px solid var(--border);font-family:var(--mono)}
 tr:last-child td{border-bottom:none}
-tr:hover td{background:#1c2128}
-
-/* Equity chart */
-#equity-chart{width:100%;height:160px;display:block}
-
-/* Comparison bars */
-.strat-bar{margin-bottom:10px}
-.strat-name{display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px}
-.bar-track{background:var(--bg);border-radius:3px;height:8px;overflow:hidden}
-.bar-fill{height:100%;border-radius:3px;transition:width .5s}
+tr:hover td{background:var(--surf2)}
 
 /* Buttons */
-button{cursor:pointer;border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:11px;font-family:inherit;transition:all .15s}
-.btn-primary{background:#1f6feb;border-color:#388bfd;color:#fff}
-.btn-primary:hover{background:#388bfd}
-.btn-secondary{background:var(--surf);color:var(--text)}
+button{cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:6px 13px;font-size:11px;font-family:inherit;font-weight:600;transition:all .15s}
+.btn-primary{background:var(--green-dim);border-color:var(--green);color:#eafff2}
+.btn-primary:hover{background:var(--green);color:#06210f}
+.btn-secondary{background:var(--surf2);color:var(--text)}
 .btn-secondary:hover{background:var(--border)}
 button:disabled{opacity:.5;cursor:not-allowed}
 
 /* Job status */
-.job-pill{display:inline-block;padding:3px 8px;border-radius:12px;font-size:10px;font-weight:600}
-.job-running{background:#112233;color:var(--blue)}
-.job-done{background:#1a3a1a;color:var(--green)}
-.job-error{background:#3d1014;color:var(--red)}
+.job-pill{display:inline-block;padding:3px 9px;border-radius:8px;font-size:10px;font-weight:700}
+.job-running{background:rgba(91,157,255,.15);color:var(--blue)}
+.job-done{background:rgba(63,215,122,.15);color:var(--green)}
+.job-error{background:rgba(255,93,82,.15);color:var(--red)}
 
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@media(max-width:1100px){.metrics{grid-template-columns:repeat(3,1fr)}main{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -314,176 +339,99 @@ button:disabled{opacity:.5;cursor:not-allowed}
 </header>
 
 <div class="metrics">
-  <div class="metric"><div class="lbl">Win Rate</div><div class="val" id="m-winrate">—</div><div class="sub" id="m-winrate-sub">live trades</div></div>
-  <div class="metric"><div class="lbl">Sleeve Net P&amp;L</div><div class="val" id="m-pnl">—</div><div class="sub">directional (experimental)</div></div>
-  <div class="metric"><div class="lbl">Completed Trades</div><div class="val" id="m-dd">—</div><div class="sub" id="m-dd-sub">W / L</div></div>
-  <div class="metric"><div class="lbl">Open Positions</div><div class="val" id="m-apy">—</div><div class="sub" id="m-apy-sub">awaiting settlement</div></div>
-  <div class="metric"><div class="lbl">Total Capital</div><div class="val" id="m-bal">—</div><div class="sub">wallet + manager dUSDC</div></div>
+  <div class="metric hero"><div class="lbl">PLP Position</div><div class="val" id="m-plp" style="color:var(--green)">—</div><div class="sub" id="m-plp-sub">liquidity supplied · the house</div></div>
+  <div class="metric"><div class="lbl">House Edge</div><div class="val" id="m-edge" style="color:var(--green)">—</div><div class="sub">PLP redemption rate</div></div>
+  <div class="metric"><div class="lbl">Total Capital</div><div class="val" id="m-bal">—</div><div class="sub">PLP + wallet + manager</div></div>
+  <div class="metric"><div class="lbl">LP Exposure</div><div class="val" id="m-exp">—</div><div class="sub" id="m-exp-sub">of target</div></div>
+  <div class="metric"><div class="lbl">Sleeve P&amp;L</div><div class="val" id="m-pnl">—</div><div class="sub" id="m-pnl-sub">directional · experimental</div></div>
   <div class="metric"><div class="lbl">Active Markets</div><div class="val" id="m-markets">—</div><div class="sub">BTC oracles live</div></div>
 </div>
 
 <main>
-  <!-- Left: Live market -->
+  <!-- Left: Live market + wallet -->
   <div>
     <div class="card">
       <h2>Live BTC Market</h2>
-      <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-          <span style="color:var(--muted)">Spot</span><strong id="mk-spot">—</strong>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-          <span style="color:var(--muted)">Forward</span><strong id="mk-fwd">—</strong>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-          <span style="color:var(--muted)">Expires</span><strong id="mk-expiry">—</strong>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-          <span style="color:var(--muted)">Vol (ann.)</span><strong id="mk-vol">—</strong>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0">
-          <span style="color:var(--muted)">Trend</span><strong id="mk-trend">—</strong>
-        </div>
-      </div>
-      <h2 style="margin-top:10px">Strike Grid</h2>
+      <div class="row"><span class="k">Spot</span><span class="v" id="mk-spot">—</span></div>
+      <div class="row"><span class="k">Forward</span><span class="v" id="mk-fwd">—</span></div>
+      <div class="row"><span class="k">Expires</span><span class="v" id="mk-expiry">—</span></div>
+      <div class="row"><span class="k">Vol (ann.)</span><span class="v" id="mk-vol">—</span></div>
+      <div class="row"><span class="k">Trend</span><span class="v" id="mk-trend">—</span></div>
+      <h2 style="margin-top:16px">Strike Grid</h2>
       <div class="strike-grid" id="strike-grid">—</div>
     </div>
 
     <div class="card">
-      <h2>Wallet</h2>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-        <span style="color:var(--muted)">SUI (gas)</span><span id="w-sui">—</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-        <span style="color:var(--muted)">dUSDC wallet</span><span id="w-dusdc">—</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0">
-        <span style="color:var(--muted)">Manager</span><span id="w-mgr">—</span>
-      </div>
-      <div style="margin-top:10px;font-size:10px;color:var(--muted);word-break:break-all" id="w-addr">—</div>
+      <h2>Capital</h2>
+      <div class="row"><span class="k">PLP (liquidity)</span><span class="v" id="w-plp" style="color:var(--green)">—</span></div>
+      <div class="row"><span class="k">dUSDC wallet</span><span class="v" id="w-dusdc">—</span></div>
+      <div class="row"><span class="k">Manager balance</span><span class="v" id="w-mgr">—</span></div>
+      <div class="row"><span class="k">SUI (gas)</span><span class="v" id="w-sui">—</span></div>
+      <div class="note mono" id="w-addr" style="word-break:break-all">—</div>
     </div>
   </div>
 
-  <!-- Center: Model decision + cycles -->
+  <!-- Center: LP engine (hero) + latest cycle + activity -->
   <div>
+    <div class="card glow">
+      <h2>💧 Liquidity Provision Engine <span class="tag tag-primary">PRIMARY</span></h2>
+      <div class="bigstat"><span class="num" id="lp-position">—</span><span class="unit">dUSDC in PLP</span></div>
+
+      <div class="allocbar" id="alloc-bar"><span style="width:0%;background:var(--green)"></span><span style="width:0%;background:var(--blue)"></span><span style="width:0%;background:var(--faint)"></span></div>
+      <div class="alloclegend">
+        <span><i style="background:var(--green)"></i>PLP <span id="al-plp">—</span></span>
+        <span><i style="background:var(--blue)"></i>Wallet <span id="al-wal">—</span></span>
+        <span><i style="background:var(--faint)"></i>Manager <span id="al-mgr">—</span></span>
+      </div>
+
+      <div style="margin-top:16px">
+        <div class="row"><span class="k">Redemption rate</span><span class="v" id="lp-rate">—</span></div>
+        <div class="row"><span class="k">House edge (LP gain to date)</span><span class="v" id="lp-edge">—</span></div>
+        <div class="row"><span class="k">Exposure factor → target</span><span class="v" id="lp-factor">—</span></div>
+        <div class="row"><span class="k">Last LP action</span><span class="v" id="lp-action">—</span></div>
+      </div>
+      <div class="note">
+        Vault reserves <span class="mono" id="lp-reserves">—</span> · open liability <span class="mono" id="lp-liability">—</span> of reserves.
+        FairLine earns the vault's spread as the <strong style="color:var(--text)">house</strong>; the ML/volatility signal gates exposure against directional risk (sticky — it scales position size, never thrashes in and out).
+      </div>
+    </div>
+
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <h2 style="margin:0">hermes3 Allocation</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">Latest Cycle Decision</h2>
         <div style="display:flex;align-items:center;gap:8px">
           <span id="job-pill"></span>
           <button class="btn-primary" id="btn-cycle" onclick="runCycle()">▶ Run Cycle</button>
         </div>
       </div>
-      <div class="reasoning-box" id="reasoning">No cycle run yet — click Run Cycle to allocate.</div>
+      <div class="reasoning-box" id="reasoning">No cycle run yet — click Run Cycle.</div>
       <div class="positions" id="positions"></div>
-      <div style="margin-top:8px;font-size:10px;color:var(--muted)" id="cycle-meta">—</div>
+      <div class="note" id="cycle-meta" style="border:none;padding-top:8px">—</div>
     </div>
 
-    <div class="card" style="margin-top:12px">
-      <h2>Recent Cycles</h2>
+    <div class="card">
+      <h2>Engine Activity</h2>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr>
-            <th>Expiry</th><th>Spot</th><th>Strategy</th><th>P&amp;L</th><th>Mode</th>
-          </tr></thead>
-          <tbody id="cycles-table"><tr><td colspan="5" style="color:var(--muted)">No cycles yet</td></tr></tbody>
+          <thead><tr><th>Time</th><th>Vol</th><th>LP Action</th><th>Target</th><th>Sleeve</th><th>Mode</th></tr></thead>
+          <tbody id="cycles-table"><tr><td colspan="6" style="color:var(--muted)">No cycles yet</td></tr></tbody>
         </table>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:12px">
-      <h2>Equity Curve (Backtest — FairLine vs Always UP)</h2>
-      <canvas id="equity-chart"></canvas>
-      <div style="display:flex;gap:16px;margin-top:8px;font-size:10px">
-        <span><span style="color:var(--blue)">■</span> FairLine</span>
-        <span><span style="color:var(--red)">■</span> Always UP</span>
-        <span><span style="color:var(--purple)">■</span> PLP Only</span>
       </div>
     </div>
   </div>
 
-  <!-- Right: Simulation results -->
+  <!-- Right: ML risk gate + directional sleeve -->
   <div>
-    <div class="card" style="border-color:var(--green)">
-      <h2>💧 Liquidity Provision <span style="font-size:10px;color:var(--green)">PRIMARY</span></h2>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-        <span style="color:var(--muted)">PLP position</span><span id="lp-position">—</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-        <span style="color:var(--muted)">Redemption rate</span><span id="lp-rate">—</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-        <span style="color:var(--muted)">House edge (LP gain)</span><span id="lp-edge">—</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-        <span style="color:var(--muted)">Exposure factor → target</span><span id="lp-factor">—</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0">
-        <span style="color:var(--muted)">Last LP action</span><span id="lp-action">—</span>
-      </div>
-      <div style="margin-top:8px;font-size:10px;color:var(--muted);line-height:1.6">
-        Vault reserves <span id="lp-reserves">—</span> · open liability <span id="lp-liability">—</span>.
-        FairLine earns the vault's spread as the house; ML/vol signal gates exposure against directional risk.
-      </div>
+    <div class="card">
+      <h2>ML Risk Gate</h2>
+      <div class="note" style="border:none;padding:0 0 10px;margin:0">A directional model used <strong style="color:var(--text)">defensively</strong> — it scales LP exposure down when a strong move is likely, not to place bets.</div>
+      <div id="ml-stats">Loading…</div>
     </div>
 
     <div class="card">
-      <h2>Simulation Results</h2>
-      <div id="sim-period" style="font-size:10px;color:var(--muted);margin-bottom:10px">—</div>
-
-      <div class="strat-bar">
-        <div class="strat-name">
-          <span style="color:var(--blue)">FairLine</span>
-          <span id="sim-fl-ret">—</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill" id="sim-fl-bar" style="background:var(--blue);width:0%"></div></div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px" id="sim-fl-detail">—</div>
-      </div>
-
-      <div class="strat-bar">
-        <div class="strat-name">
-          <span style="color:var(--purple)">PLP Only</span>
-          <span id="sim-plp-ret">—</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill" id="sim-plp-bar" style="background:var(--purple);width:0%"></div></div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px" id="sim-plp-detail">—</div>
-      </div>
-
-      <div class="strat-bar">
-        <div class="strat-name">
-          <span style="color:var(--red)">Always UP</span>
-          <span id="sim-au-ret">—</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill" id="sim-au-bar" style="background:var(--red);width:0%"></div></div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px" id="sim-au-detail">—</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>FairLine Metrics</h2>
-      <div id="sim-metrics" style="font-size:12px">—</div>
-    </div>
-
-    <div class="card">
-      <h2>Directional Sleeve <span style="font-size:10px;color:var(--yellow)">EXPERIMENTAL</span></h2>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Small capped research sleeve — full on-chain P&amp;L, reported honestly. Not the primary income strategy.</div>
-      <div id="live-results" style="font-size:12px">Loading…</div>
-    </div>
-
-    <div class="card">
-      <h2>ML Model</h2>
-      <div id="ml-stats" style="font-size:12px">Loading…</div>
-    </div>
-
-    <div class="card">
-      <h2>Methodology</h2>
-      <div style="font-size:11px;color:var(--muted);line-height:1.7">
-        <div>• <strong style="color:var(--text)">Data</strong>: Real on-chain settled BTC oracles</div>
-        <div>• <strong style="color:var(--text)">ML model</strong>: Logistic regression, 12 features, 5-fold CV</div>
-        <div>• <strong style="color:var(--text)">Ask</strong>: 51.5% ATM (live devInspect)</div>
-        <div>• <strong style="color:var(--text)">Return</strong>: Total % over backtest window (no APY extrapolation)</div>
-        <div>• <strong style="color:var(--text)">Capital</strong>: 100 dUSDC simulated start</div>
-        <div>• <strong style="color:var(--text)">Size</strong>: 5 dUSDC max payout / position</div>
-      </div>
+      <h2>Directional Sleeve <span class="tag tag-exp">EXPERIMENTAL</span></h2>
+      <div class="note" style="border:none;padding:0 0 10px;margin:0">Small capped research sleeve (≤15/position, ≤45/cycle). Full on-chain P&amp;L, reported honestly — not the income strategy.</div>
+      <div id="live-results">Loading…</div>
     </div>
   </div>
 </main>
@@ -539,149 +487,85 @@ async function loadMarket(){
 
 // ── Vault ────────────────────────────────────────────────────────────────────
 
+const S={wallet:0,manager:0,plp:0,target:0};
+
 async function loadVault(){
   const d=await api('/api/vault');
+  const mgrBal=(d.manager?.balances?.find(b=>b.quote_asset.includes('dusdc'))?.balance??0)/1e6;
+  S.wallet=d.dusdc_wallet; S.manager=mgrBal;
   document.getElementById('w-sui').textContent=d.sui_balance.toFixed(4)+' SUI';
-  document.getElementById('w-dusdc').textContent=d.dusdc_wallet.toFixed(6)+' dUSDC';
-  const mgrBal=d.manager?.balances?.find(b=>b.quote_asset.includes('dusdc'))?.balance??0;
-  document.getElementById('w-mgr').textContent=(mgrBal/1e6).toFixed(6)+' dUSDC';
+  document.getElementById('w-dusdc').textContent=d.dusdc_wallet.toFixed(2)+' dUSDC';
+  document.getElementById('w-mgr').textContent=mgrBal.toFixed(2)+' dUSDC';
   document.getElementById('w-addr').textContent=d.address;
+}
 
-  // Metrics — total capital (wallet + manager, excluding PLP)
-  const total=(d.dusdc_wallet+(mgrBal/1e6));
-  document.getElementById('m-bal').textContent=total.toFixed(2);
-  document.getElementById('m-bal').style.color='var(--green)';
+// Cross-cutting capital view — needs both wallet (loadVault) and PLP (loadPlp).
+function renderCapital(){
+  const total=S.plp+S.wallet+S.manager;
+  document.getElementById('m-bal').textContent=total.toFixed(0);
+  const pct=v=>total>0?(v/total*100):0;
+  const bar=document.getElementById('alloc-bar').children;
+  bar[0].style.width=pct(S.plp)+'%'; bar[1].style.width=pct(S.wallet)+'%'; bar[2].style.width=pct(S.manager)+'%';
+  document.getElementById('al-plp').textContent=pct(S.plp).toFixed(0)+'%';
+  document.getElementById('al-wal').textContent=pct(S.wallet).toFixed(0)+'%';
+  document.getElementById('al-mgr').textContent=pct(S.manager).toFixed(0)+'%';
+  if(S.target>0){
+    document.getElementById('m-exp').textContent=Math.min(100,S.plp/S.target*100).toFixed(0)+'%';
+    document.getElementById('m-exp-sub').textContent='of '+S.target.toFixed(0)+' dUSDC target';
+  }else{
+    document.getElementById('m-exp').textContent='—';
+    document.getElementById('m-exp-sub').textContent='awaiting next cycle';
+  }
 }
 
 // ── Cycles ───────────────────────────────────────────────────────────────────
 
+function lpActionChip(a){
+  const c=a==='supply'?'var(--green)':a==='pullback'?'var(--red)':a==='none'?'var(--amber)':'var(--muted)';
+  return '<span style="color:'+c+'">'+(a||'—')+'</span>';
+}
+
 async function loadCycles(){
   const cycles=await api('/api/cycles');
   const tbody=document.getElementById('cycles-table');
-  if(!cycles.length){tbody.innerHTML='<tr><td colspan="5" style="color:var(--muted)">No cycles yet — click Run Cycle</td></tr>';return;}
+  if(!cycles.length){tbody.innerHTML='<tr><td colspan="6" style="color:var(--muted)">No cycles yet — click Run Cycle</td></tr>';return;}
 
-  // Show latest decision
+  // Latest decision (LP + sleeve)
   const latest=cycles[0];
-  const d=latest.decision;
-  document.getElementById('reasoning').textContent=d.reasoning||'—';
-  document.getElementById('cycle-meta').textContent=
-    fmtDate(latest.ts)+' · '+d.confidence+' confidence · '+(latest.sim_only?'SIM mode':'LIVE');
+  const d=latest.decision, lp=latest.lp;
+  let reason='';
+  if(lp) reason+='LP: '+(lp.action==='supply'?'supplying toward '+lp.target.toFixed(0)+' dUSDC target (factor '+lp.factor.toFixed(2)+')':lp.action==='hold'?'holding '+lp.current.toFixed(0)+' dUSDC (factor '+lp.factor.toFixed(2)+')':lp.action)+'. ';
+  reason+='Sleeve: '+(d.skip?(d.skip_reason||'idle'):(d.reasoning||'active'));
+  document.getElementById('reasoning').textContent=reason||'—';
+  document.getElementById('cycle-meta').textContent=fmtDate(latest.ts)+' · '+(latest.sim_only?'SIM mode':'LIVE 🔴');
 
   const posEl=document.getElementById('positions');
-  if(d.skip){
-    posEl.innerHTML='<span class="pos-chip pos-skip">SKIP</span>';
-  } else {
-    let html='';
-    if(d.supply_usdc>0) html+='<span class="pos-chip pos-supply">PLP +'+d.supply_usdc.toFixed(1)+' dUSDC</span>';
-    for(const p of (d.positions||[])){
-      if(p.type==='up') html+='<span class="pos-chip pos-up">UP $'+p.strike+' / '+p.quantity_usdc+' dUSDC</span>';
-      else if(p.type==='down') html+='<span class="pos-chip pos-down">DOWN $'+p.strike+' / '+p.quantity_usdc+' dUSDC</span>';
-      else html+='<span class="pos-chip pos-range">RANGE $'+p.lower_strike+'-$'+p.higher_strike+' / '+p.quantity_usdc+' dUSDC</span>';
-    }
-    posEl.innerHTML=html||'<span class="pos-chip pos-skip">SKIP</span>';
+  let html='';
+  if(lp&&lp.action==='supply') html+='<span class="pos-chip pos-supply">PLP SUPPLY → '+lp.target.toFixed(0)+'</span>';
+  else if(lp) html+='<span class="pos-chip pos-skip">LP '+lp.action.toUpperCase()+'</span>';
+  if(d.skip) html+='<span class="pos-chip pos-skip">SLEEVE IDLE</span>';
+  for(const p of (d.positions||[])){
+    if(p.type==='up') html+='<span class="pos-chip pos-up">UP $'+p.strike+' / '+p.quantity_usdc+'</span>';
+    else if(p.type==='down') html+='<span class="pos-chip pos-down">DOWN $'+p.strike+' / '+p.quantity_usdc+'</span>';
+    else html+='<span class="pos-chip pos-range">RANGE '+p.lower_strike+'-'+p.higher_strike+'</span>';
   }
+  posEl.innerHTML=html;
 
-  // Table
-  tbody.innerHTML=cycles.slice(0,15).map(c=>{
-    const dec=c.decision;
-    const pnlSign=dec.positions?.[0]?.pnl??0;
-    const stratLabel=dec.skip?'SKIP':
-      (dec.positions||[]).map(p=>p.type.toUpperCase()).join('+');
-    const mode=c.sim_only?'<span style="color:var(--yellow)">SIM</span>':'<span style="color:var(--green)">LIVE</span>';
+  // Activity table
+  tbody.innerHTML=cycles.slice(0,14).map(c=>{
+    const lp=c.lp, dec=c.decision;
+    const vol=(c.features&&c.features.realized_vol_pct!=null)?c.features.realized_vol_pct.toFixed(0)+'%':'—';
+    const sleeve=dec.skip?'idle':(dec.positions||[]).map(p=>p.type.toUpperCase()).join('+')||'idle';
+    const mode=c.sim_only?'<span style="color:var(--amber)">SIM</span>':'<span style="color:var(--green)">LIVE</span>';
     return '<tr>'+
-      '<td>'+new Date(c.expiry).toISOString().slice(11,16)+'</td>'+
-      '<td>$'+(c.spot_usd||0).toLocaleString('en-US',{maximumFractionDigits:0})+'</td>'+
-      '<td>'+esc(stratLabel)+'</td>'+
-      '<td style="color:var(--muted);font-size:10px">'+(dec.skip?'—':'pending settlement')+'</td>'+
+      '<td>'+new Date(c.ts).toISOString().slice(11,16)+'</td>'+
+      '<td>'+vol+'</td>'+
+      '<td>'+lpActionChip(lp&&lp.action)+'</td>'+
+      '<td>'+(lp?lp.target.toFixed(0):'—')+'</td>'+
+      '<td style="color:var(--muted)">'+esc(sleeve)+'</td>'+
       '<td>'+mode+'</td>'+
     '</tr>';
   }).join('');
-}
-
-// ── Simulation ───────────────────────────────────────────────────────────────
-
-async function loadSim(){
-  let sim;
-  try{sim=await api('/api/simulation');}catch{document.getElementById('sim-period').textContent='Run npm run simulate to generate results.';return;}
-
-  const fl=sim.strategies.fairline;
-  const au=sim.strategies.always_up;
-  const plp=sim.strategies.plp_only;
-  const cfg=sim.config;
-
-  document.getElementById('sim-period').textContent=
-    cfg.n_oracles+' oracles · '+cfg.period_start.slice(0,10)+' → '+cfg.period_end.slice(0,10);
-
-  const simHours=(cfg.n_oracles*15/60).toFixed(0);
-
-  // Strategy bars (normalize to ±50% range)
-  function barWidth(ret){return Math.min(Math.abs(ret*100),100).toFixed(0)+'%';}
-  document.getElementById('sim-fl-ret').textContent=(fl.total_return*100>=0?'+':'')+( fl.total_return*100).toFixed(1)+'%';
-  document.getElementById('sim-fl-bar').style.width=barWidth(fl.total_return);
-  document.getElementById('sim-fl-detail').textContent='Win rate '+(fl.win_rate*100).toFixed(1)+'% · Sharpe '+fl.sharpe.toFixed(2)+' · '+fl.cycles_run+' cycles run';
-
-  document.getElementById('sim-plp-ret').textContent='+'+(plp.total_return*100).toFixed(1)+'%';
-  document.getElementById('sim-plp-bar').style.width=barWidth(plp.total_return);
-  document.getElementById('sim-plp-detail').textContent='Yield 0.20%/cycle · passive liquidity provision';
-
-  document.getElementById('sim-au-ret').textContent=(au.total_return*100>=0?'+':'')+(au.total_return*100).toFixed(1)+'%';
-  document.getElementById('sim-au-bar').style.width=barWidth(Math.abs(au.total_return));
-  document.getElementById('sim-au-bar').style.background='var(--red)';
-  document.getElementById('sim-au-detail').textContent='Win rate '+(au.win_rate*100).toFixed(1)+'% · no vol filter · loses to spread';
-
-  // Metrics card
-  document.getElementById('sim-metrics').innerHTML=[
-    ['Cycles run', fl.cycles_run+' / '+cfg.n_oracles],
-    ['Cycles skipped', fl.cycles_skipped+' (vol filter)'],
-    ['Win / Loss', fl.wins+' / '+fl.losses],
-    ['Total return', (fl.total_return*100).toFixed(2)+'%'],
-    ['Max drawdown', (fl.max_drawdown*100).toFixed(2)+'%'],
-    ['Sharpe ratio', fl.sharpe.toFixed(2)],
-    ['Period return', (fl.total_return*100>=0?'+':'')+(fl.total_return*100).toFixed(2)+'% over '+simHours+'hr'],
-  ].map(([k,v])=>
-    '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">'+
-    '<span style="color:var(--muted)">'+k+'</span><strong>'+v+'</strong></div>'
-  ).join('');
-
-  // Chart
-  drawChart(fl.equity_curve, au.equity_curve, plp.equity_curve);
-}
-
-// ── Equity chart ─────────────────────────────────────────────────────────────
-
-function drawChart(fl, au, plp){
-  const canvas=document.getElementById('equity-chart');
-  const ctx=canvas.getContext('2d');
-  const W=canvas.parentElement.clientWidth-28;
-  const H=160;
-  canvas.width=W; canvas.height=H;
-
-  const allVals=[...fl,...au,...plp].map(p=>p.equity);
-  const minV=Math.min(...allVals)*0.98;
-  const maxV=Math.max(...allVals)*1.02;
-  const scaleY=v=>H-(v-minV)/(maxV-minV)*H*0.9-H*0.05;
-  const scaleX=(i,len)=>i/(len-1)*W;
-
-  function drawLine(data,color){
-    if(data.length<2)return;
-    ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=1.5;
-    data.forEach((p,i)=>{
-      const x=scaleX(i,data.length),y=scaleY(p.equity);
-      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-    });
-    ctx.stroke();
-  }
-
-  // Grid line at 100
-  const y100=scaleY(100);
-  ctx.strokeStyle='#30363d';ctx.lineWidth=1;ctx.setLineDash([4,4]);
-  ctx.beginPath();ctx.moveTo(0,y100);ctx.lineTo(W,y100);ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle='#8b949e';ctx.font='10px monospace';ctx.fillText('100 dUSDC',4,y100-3);
-
-  drawLine(fl,'#58a6ff');
-  drawLine(au,'#f85149');
-  drawLine(plp,'#bc8cff');
 }
 
 // ── Cycle runner ─────────────────────────────────────────────────────────────
@@ -744,18 +628,11 @@ async function loadLiveResults(){
   try{
     const d=await api('/api/summary');
 
-    // ── Drive top metrics bar from live data ──────────────────────────────────
+    // ── Sleeve P&L metric tile ────────────────────────────────────────────────
     if(d&&d.total_trades>0){
-      const wr=d.overall_win_rate*100;
-      document.getElementById('m-winrate').textContent=wr.toFixed(1)+'%';
-      document.getElementById('m-winrate').style.color=wr>=51.5?'var(--green)':'var(--red)';
-      document.getElementById('m-winrate-sub').textContent=d.total_trades+' live trades';
-      document.getElementById('m-pnl').textContent=(d.net_pnl>=0?'+':'')+d.net_pnl.toFixed(3);
+      document.getElementById('m-pnl').textContent=(d.net_pnl>=0?'+':'')+d.net_pnl.toFixed(1);
       document.getElementById('m-pnl').style.color=d.net_pnl>=0?'var(--green)':'var(--red)';
-      document.getElementById('m-dd').textContent=d.total_trades;
-      document.getElementById('m-dd-sub').textContent=d.total_wins+'W / '+d.total_losses+'L';
-      document.getElementById('m-apy').textContent=d.open_positions;
-      document.getElementById('m-apy-sub').textContent='awaiting settlement';
+      document.getElementById('m-pnl-sub').textContent=d.total_wins+'W / '+d.total_losses+'L · '+(d.overall_win_rate*100).toFixed(0)+'% win';
     }
 
     if(!d||d.total_trades===0){document.getElementById('live-results').innerHTML='<div style="color:var(--muted)">No completed trades yet — first results appear after a position settles.</div>';return;}
@@ -782,25 +659,30 @@ async function loadPlp(){
   try{
     const d=await api('/api/plp');
     const held=d.plp_value_dusdc||0;
-    document.getElementById('lp-position').textContent=held.toFixed(2)+' dUSDC'+(d.plp_held>0?' ('+d.plp_held.toFixed(2)+' PLP)':'');
-    document.getElementById('lp-position').style.color=held>0?'var(--green)':'var(--muted)';
+    S.plp=held;
+    // Hero + metric tiles
+    document.getElementById('lp-position').textContent=held.toFixed(0);
+    document.getElementById('m-plp').textContent=held.toFixed(0);
+    document.getElementById('m-edge').textContent=(d.house_edge_pct>=0?'+':'')+d.house_edge_pct.toFixed(3)+'%';
+    document.getElementById('w-plp').textContent=held.toFixed(2)+' dUSDC';
     document.getElementById('lp-rate').textContent=d.redemption_rate.toFixed(6);
     document.getElementById('lp-edge').textContent=(d.house_edge_pct>=0?'+':'')+d.house_edge_pct.toFixed(4)+'%';
     document.getElementById('lp-edge').style.color=d.house_edge_pct>=0?'var(--green)':'var(--red)';
     if(d.lp_engine){
+      S.target=d.lp_engine.target||0;
       document.getElementById('lp-factor').textContent=d.lp_engine.factor.toFixed(2)+' → '+d.lp_engine.target.toFixed(0)+' dUSDC';
       const act=d.lp_engine.action;
-      document.getElementById('lp-action').textContent=act;
-      document.getElementById('lp-action').style.color=act==='supply'?'var(--green)':act==='pullback'?'var(--red)':'var(--muted)';
+      document.getElementById('lp-action').innerHTML=lpActionChip(act);
     }
     document.getElementById('lp-reserves').textContent=(d.reserves_dusdc/1e6).toFixed(2)+'M dUSDC';
-    document.getElementById('lp-liability').textContent=d.open_liability_dusdc.toFixed(0)+' dUSDC';
+    document.getElementById('lp-liability').textContent=(d.open_liability_dusdc/d.reserves_dusdc*100).toFixed(3)+'%';
   }catch(e){}
 }
 
 async function loadAll(){
   document.getElementById('hd-time').textContent=new Date().toLocaleTimeString();
-  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadSim(),loadModelStats(),loadLiveResults(),loadPlp()]);
+  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp()]);
+  renderCapital();
 }
 
 loadAll();

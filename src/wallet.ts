@@ -5,7 +5,7 @@
 import { SuiClient, SuiTransactionBlockResponse } from '@mysten/sui/client';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { Transaction } from '@mysten/sui/transactions';
-import { SUI_RPC_URL, WALLET_PRIVATE_KEY } from './config.js';
+import { SUI_RPC_URL, WALLET_PRIVATE_KEY, WALLET_ADDRESS } from './config.js';
 
 const client = new SuiClient({ url: SUI_RPC_URL });
 
@@ -15,7 +15,11 @@ function getKeypair(): Ed25519Keypair {
 }
 
 export function getAddress(): string {
-  return getKeypair().toSuiAddress();
+  // Prefer the key-derived address; fall back to the public address for
+  // read-only views (dashboard) when no private key is configured.
+  if (WALLET_PRIVATE_KEY) return getKeypair().toSuiAddress();
+  if (WALLET_ADDRESS) return WALLET_ADDRESS;
+  throw new Error('No WALLET_PRIVATE_KEY or WALLET_ADDRESS configured');
 }
 
 export { client };

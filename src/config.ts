@@ -75,3 +75,8 @@ export const MANAGER_ID = process.env.MANAGER_ID ?? '';
 
 // Wallet private key (testnet only — never put mainnet key here)
 export const WALLET_PRIVATE_KEY = process.env.WALLET_PRIVATE_KEY ?? '';
+
+// Public wallet address — used for read-only views (dashboard) when no private
+// key is configured. This is public on-chain info, never the private key.
+export const WALLET_ADDRESS = process.env.WALLET_ADDRESS
+  ?? '0x43a5782881f7ae4584fb7a3d9d9b3cd3440ed634a67301de5e45f734505e8e7d';
