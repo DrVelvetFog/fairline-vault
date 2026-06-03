@@ -48,10 +48,13 @@ function dayKey(ms: number): string {
 async function main() {
   console.log('\n━━━ FairLine — Daily P&L Summary ━━━\n');
 
-  const [{ minted, redeemed }, summary] = await Promise.all([
-    getManagerPositions(MANAGER_ID),
-    getManagerSummary(MANAGER_ID),
-  ]);
+  // Positions are the core data; manager summary is supplementary (one display line).
+  // Fetch summary tolerantly so a transient indexer outage never crash-loops this job.
+  const { minted, redeemed } = await getManagerPositions(MANAGER_ID);
+  const summary = await getManagerSummary(MANAGER_ID).catch(err => {
+    console.log(`  [warn] manager summary unavailable: ${String(err).slice(0, 80)}`);
+    return null;
+  });
 
   // Index minted positions by oracle_id (one position per oracle by design)
   const mintByOracle = new Map<string, ManagerPosition>();
@@ -131,8 +134,8 @@ async function main() {
   console.log(`Net realized P&L : ${totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(4)} dUSDC`);
   console.log(`Open positions   : ${openCount} (awaiting settlement)`);
 
-  const mgrBal = (summary.balances.find(b => b.quote_asset.includes('dusdc'))?.balance ?? 0) / SCALE;
-  console.log(`Manager balance  : ${mgrBal.toFixed(4)} dUSDC`);
+  const mgrBal = (summary?.balances.find(b => b.quote_asset.includes('dusdc'))?.balance ?? 0) / SCALE;
+  console.log(`Manager balance  : ${summary ? mgrBal.toFixed(4) + ' dUSDC' : '(unavailable)'}`);
 
   // ── Save JSON for dashboard ────────────────────────────────────────────────
   const output = {

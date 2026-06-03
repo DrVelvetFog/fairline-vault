@@ -74,10 +74,36 @@ export interface ManagerRecord {
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
 
+const RETRIES = 3;          // total attempts on transient failure
+const RETRY_DELAY_MS = 800; // base backoff (linear: 0.8s, 1.6s, 2.4s)
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/**
+ * GET an indexer endpoint with retry-on-transient-failure.
+ * Retries on 5xx (the indexer intermittently 500s) and network errors;
+ * 4xx and other client errors throw immediately (not transient).
+ */
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${PREDICT_SERVER}${path}`);
-  if (!res.ok) throw new Error(`Indexer ${path}: HTTP ${res.status}`);
-  return res.json() as Promise<T>;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= RETRIES; attempt++) {
+    try {
+      const res = await fetch(`${PREDICT_SERVER}${path}`);
+      if (res.ok) return res.json() as Promise<T>;
+      // Only 5xx is transient/retryable; 4xx is a real client error.
+      if (res.status < 500 || attempt === RETRIES) {
+        throw new Error(`Indexer ${path}: HTTP ${res.status}`);
+      }
+      lastErr = new Error(`Indexer ${path}: HTTP ${res.status}`);
+    } catch (err) {
+      lastErr = err;
+      // Re-throw immediately on non-retryable client errors.
+      if (err instanceof Error && /HTTP 4\d\d/.test(err.message)) throw err;
+      if (attempt === RETRIES) throw err;
+    }
+    await sleep(RETRY_DELAY_MS * attempt);
+  }
+  throw lastErr;
 }
 
 // ── Oracle endpoints ──────────────────────────────────────────────────────────
