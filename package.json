@@ -24,7 +24,8 @@
     "lp-supply": "tsx src/lp-supply.ts",
     "vault-deploy": "tsx src/vault-strategy.ts deploy",
     "vault-mark": "tsx src/vault-strategy.ts mark",
-    "snapshot": "tsx src/accrual-snapshot.ts"
+    "snapshot": "tsx src/accrual-snapshot.ts",
+    "demo-multiuser": "tsx src/demo-multiuser.ts"
   },
   "dependencies": {
     "@mysten/sui": "^1.45.2",
