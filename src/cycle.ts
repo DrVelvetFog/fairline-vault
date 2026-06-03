@@ -21,7 +21,7 @@ import { decide, ping, AllocationDecision, CycleContext } from './model.js';
 import { predict as mlPredict, formatPrediction } from './ml-model.js';
 import {
   buildDepositAndMint, buildDepositAndMintRange, buildSupply,
-  buildMint, buildGetTradeAmounts, buildSupplyFromManager, buildWithdrawLiquidity,
+  buildMint, buildGetTradeAmounts, buildSupplyFromManager,
 } from './transactions.js';
 import { getDusdcCoins, getPlpCoins, formatBalance } from './coins.js';
 import { execute, inspect, getAddress } from './wallet.js';
@@ -238,52 +238,60 @@ async function executeDecision(
 }
 
 /**
- * Rebalance the LP position toward target.
- *  - extreme vol → withdraw all PLP (full pullback)
- *  - under target by > band → supply the gap from the Manager balance
- *  - otherwise → hold (no churn)
+ * Rebalance the LP position toward target — STICKY LP (no auto-exit).
+ *
+ * Volatility/ML only scale how much we ADD (via the exposure factor → target);
+ * we never auto-withdraw. With the vault's open liability at ~0.09% of reserves,
+ * forced exits would only churn gas and strand capital — so we scale position
+ * size by risk instead of thrashing in and out.
+ *
+ * Funds are sourced from the WALLET first (to drain any dUSDC left there by past
+ * withdrawals), then from the Manager balance.
  */
 async function rebalanceLP(
-  lpDelta:       number,        // human dUSDC: + supply more, - over target
-  vol:           number,
-  currentPlp:    number,
+  lpDelta:       number,        // human dUSDC under target (only act when positive)
+  walletCoins:   CoinStruct[],
+  walletRaw:     bigint,
   managerBalRaw: bigint,
-  plpCoins:      CoinStruct[],
 ): Promise<{ digests: string[]; action: string }> {
   const digests: string[] = [];
   const address = getAddress();
+  const min1    = humanToDusdc(1);
 
-  // Full pullback in extreme vol — exit liquidity from harm's way.
-  if (vol >= EXTREME_VOL_THRESHOLD && currentPlp > LP_REBALANCE_BAND) {
-    console.log(`  [LP] extreme vol ${vol.toFixed(1)}% — pulling all liquidity (${currentPlp.toFixed(1)} dUSDC PLP)`);
-    for (const c of plpCoins) {
-      const tx = buildWithdrawLiquidity(c.coinObjectId, address);
-      if (LIVE_MODE) { const r = await execute(tx); digests.push(r.digest); console.log(`  ✓ withdraw ${r.digest}`); }
-      else           { await inspect(tx);            console.log(`  [sim] withdraw PTB valid`); }
-    }
-    return { digests, action: 'pullback' };
+  if (lpDelta <= LP_REBALANCE_BAND) {
+    console.log(`  [LP] within band — holding`);
+    return { digests, action: 'hold' };
   }
 
-  // Supply toward target, funded directly from the Manager balance.
-  if (lpDelta > LP_REBALANCE_BAND) {
-    const wantRaw   = humanToDusdc(lpDelta);
-    const supplyRaw = wantRaw <= managerBalRaw ? wantRaw : managerBalRaw;
-    if (supplyRaw < humanToDusdc(1)) {
-      console.log(`  [LP] manager balance too low to supply (${(Number(managerBalRaw) / Number(DUSDC_SCALE)).toFixed(2)} dUSDC)`);
-      return { digests, action: 'none' };
-    }
-    if (supplyRaw < wantRaw) {
-      console.log(`  [LP] capping supply ${lpDelta.toFixed(1)} → ${(Number(supplyRaw) / Number(DUSDC_SCALE)).toFixed(1)} dUSDC (manager-limited)`);
-    }
-    console.log(`  [LP] supplying ${(Number(supplyRaw) / Number(DUSDC_SCALE)).toFixed(1)} dUSDC → PLP (from manager)`);
-    const tx = buildSupplyFromManager(MANAGER_ID, supplyRaw, address);
+  let need = humanToDusdc(lpDelta);
+  let suppliedRaw = 0n;
+
+  // 1. Source from the wallet first (drains capital left there by past withdrawals).
+  const fromWallet = need <= walletRaw ? need : walletRaw;
+  if (fromWallet >= min1) {
+    console.log(`  [LP] supplying ${(Number(fromWallet) / Number(DUSDC_SCALE)).toFixed(1)} dUSDC → PLP (from wallet)`);
+    const tx = buildSupply(walletCoins, fromWallet, address);
+    if (LIVE_MODE) { const r = await execute(tx); digests.push(r.digest); console.log(`  ✓ supply ${r.digest}`); }
+    else           { await inspect(tx);            console.log(`  [sim] supply-from-wallet PTB valid`); }
+    suppliedRaw += fromWallet;
+    need        -= fromWallet;
+  }
+
+  // 2. Source the remainder from the Manager balance.
+  const fromMgr = need <= managerBalRaw ? need : managerBalRaw;
+  if (fromMgr >= min1) {
+    console.log(`  [LP] supplying ${(Number(fromMgr) / Number(DUSDC_SCALE)).toFixed(1)} dUSDC → PLP (from manager)`);
+    const tx = buildSupplyFromManager(MANAGER_ID, fromMgr, address);
     if (LIVE_MODE) { const r = await execute(tx); digests.push(r.digest); console.log(`  ✓ supply ${r.digest}`); }
     else           { await inspect(tx);            console.log(`  [sim] supply-from-manager PTB valid`); }
-    return { digests, action: 'supply' };
+    suppliedRaw += fromMgr;
   }
 
-  console.log(`  [LP] within band — holding`);
-  return { digests, action: 'hold' };
+  if (suppliedRaw === 0n) {
+    console.log(`  [LP] no wallet/manager liquidity available to supply`);
+    return { digests, action: 'none' };
+  }
+  return { digests, action: 'supply' };
 }
 
 // ── Main cycle ────────────────────────────────────────────────────────────────
@@ -358,14 +366,17 @@ export async function runCycle(): Promise<void> {
   let execError: string | undefined;
 
   // ── PRIMARY: ML/vol-gated liquidity provision ──────────────────────────────
+  // Target is a share of TOTAL capital (liquid + already in PLP), so the position
+  // converges to LP_TARGET_PCT of everything, not of the shrinking liquid balance.
+  const totalCapital = totalH + currentPlp;
   const lpFactor = computeLpExposureFactor(vol, mlPrediction);
-  const lpTarget = Math.min(totalH * LP_TARGET_PCT * lpFactor, MAX_PLP_DUSDC);
+  const lpTarget = Math.min(totalCapital * LP_TARGET_PCT * lpFactor, MAX_PLP_DUSDC);
   const lpDelta  = lpTarget - currentPlp;
   console.log(`\n[LP engine] exposure factor ${lpFactor.toFixed(2)} → target ${lpTarget.toFixed(1)} dUSDC | current ${currentPlp.toFixed(1)} | delta ${lpDelta >= 0 ? '+' : ''}${lpDelta.toFixed(1)}`);
 
   let lpAction = 'hold';
   try {
-    const lp = await rebalanceLP(lpDelta, vol, currentPlp, managerBalRaw, plpCoins);
+    const lp = await rebalanceLP(lpDelta, dusdcBal.coins, dusdcBal.totalRaw, managerBalRaw);
     digests.push(...lp.digests);
     lpAction = lp.action;
   } catch (err) {

@@ -20,7 +20,8 @@
     "train": "python3 scripts/train_model.py",
     "retrain": "python3 scripts/retrain.py",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "lp-supply": "tsx src/lp-supply.ts"
   },
   "dependencies": {
     "@mysten/sui": "^1.45.2",
