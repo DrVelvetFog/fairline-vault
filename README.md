@@ -1,47 +1,54 @@
-# FairLine — ML-Driven Vault for DeepBook Predict
+# FairLine — Risk-Managed Liquidity Vault for DeepBook Predict
 
-> Sui Overflow 2026 · DeepBook Track
+> Sui Overflow 2026 · DeepBook Track · testnet
 
-FairLine is a capital allocation vault for [DeepBook Predict](https://docs.sui.io/onchain-finance/deepbook-predict/) on Sui testnet. Each 15-minute expiry cycle, a local ML model (hermes3 via Ollama) reads live BTC binary option market state, decides how to allocate capital across positions and PLP liquidity supply, and executes that allocation on-chain. A dashboard shows the allocation, the model's reasoning, and backtested simulation results.
+FairLine is an autonomous liquidity vault for [DeepBook Predict](https://docs.sui.io/onchain-finance/deepbook-predict/) on Sui. It earns the prediction market's structural **house edge** by providing liquidity (PLP), and uses a machine-learning directional model **defensively** — to gate that liquidity exposure against directional risk, not to gamble with it. Every decision and every transaction is on-chain and verifiable.
 
 ## The one-line pitch
 
-> PLP yield + directional alpha, managed by a model, with visible risk.
+> Be the house, not the player — automated, risk-gated liquidity provision for on-chain prediction markets, with fully verifiable results.
+
+📄 See [`SUBMISSION.md`](./SUBMISSION.md) for the full narrative, including the honest player → house pivot.
 
 ---
 
 ## What it does
 
-1. **Reads** live BTC Predict market state from `predict-server.testnet.mystenlabs.com`
-2. **Allocates** — hermes3 (local Ollama) outputs a capital allocation each cycle: which strikes, how much to mint, how much to supply as PLP
-3. **Executes** — places that allocation on Sui testnet via `predict::mint`, `predict::mint_range`, `predict::supply`
-4. **Simulates** — backtests 500 real settled BTC oracles to produce P&L, drawdown, and win rate vs. naïve baselines
-5. **Shows** — one-screen dashboard: live market, model reasoning, equity curve, simulation metrics
+Each 15-minute cycle, the autonomous watcher:
+
+1. **Reads** live BTC Predict market state from `predict-server.testnet.mystenlabs.com`.
+2. **Sizes LP exposure** — a target ~70% of capital in PLP, scaled by an ML/volatility risk gate (the house's only real risk is a large directional move).
+3. **Supplies liquidity** toward target on-chain via `predict::supply` (sourced atomically from the PredictManager balance).
+4. **Runs a small capped directional sleeve** — experimental ML-driven bets (≤15 dUSDC/position, ≤45/cycle), only in calm regimes with high model confidence. Its full P&L is reported honestly.
+5. **Shows** everything on a one-screen dashboard: live LP position, redemption-rate accrual, the LP risk gate, and an honest split between LP income and the experimental sleeve.
 
 ---
 
-## Simulation results (500 oracles · May 24–June 1 · testnet)
+## Why liquidity provision — the verifiable edge
 
-| Strategy | Win Rate | Total Return | Max Drawdown | Sharpe |
-|---|---|---|---|---|
-| **FairLine** | **60.6%** | **+137.4%** | **9.1%** | **33.97** |
-| Always UP | 49.0% | -68.6% | 85.2% | -10.28 |
-| PLP Only | — | +171.6% | ~0% | — |
+DeepBook Predict's vault is the counterparty (the house) to every binary-option trader. It charges a spread, so net trader losses accrue to PLP holders. This is measurable on-chain:
 
-- Starting capital: 100 dUSDC (simulated)
-- Position size: 5 dUSDC max payout per cycle
-- Ask price: 51.5% ATM (from live `get_trade_amounts` devInspect)
-- Data: real on-chain settlement prices, rolling 15-min BTC oracles
+| Fact | Value (testnet, live) | Source |
+|---|---|---|
+| PLP redemption rate | **1.003154** dUSDC/PLP | `Predict` object on-chain |
+| House edge realized to date | **+0.315%** | (rate − 1) |
+| Vault reserves | ~1,011,000 dUSDC | vault balance |
+| Vault open liability | **0.087% of reserves** | `total_mtm` / reserves |
+| House spread | 2% base (scales with utilization) | `pricing_config` |
+
+The open liability being ~0.09% of reserves is *why* FairLine uses **sticky liquidity** (it scales position size by risk rather than force-exiting) — a data-driven design choice, not an assumption.
+
+**The honest counterpoint:** FairLine began as a *directional* ML vault. Live on testnet it lost money (41.3% win rate vs ~51.5% break-even, −749 dUSDC) — the 2% spread is wider than a 63%-accurate directional model's edge. Those losses flowed into the PLP pool. So we re-weighted from the losing player to the winning house, and repurposed the ML model as a defensive risk gate. The directional strategy survives as a small, capped, transparent research sleeve.
 
 ---
 
 ## Stack
 
-- **Sui SDK** `@mysten/sui` — PTB construction, transaction execution, devInspect
-- **hermes3** (local Ollama) — allocation brain, structured JSON output
-- **DeepBook Predict** — binary positions, ranges, PLP vault (testnet)
-- **TypeScript** throughout — features, model, transactions, simulation, dashboard
-- **Express** — single-screen dashboard (port 3002)
+- **Sui SDK** `@mysten/sui` — PTB construction, transaction execution, devInspect previews
+- **DeepBook Predict** — PLP liquidity supply/withdraw, binary positions, ranges (testnet)
+- **ML risk gate** — logistic regression (12 features, 5-fold CV), retrained on settled oracles
+- **hermes3** (local Ollama) — sizing + natural-language reasoning for the directional sleeve
+- **TypeScript** throughout; **Express** dashboard; **pm2** for autonomous operation
 
 ---
 
@@ -61,28 +68,55 @@ npm run market
 # 4. Create a PredictManager on testnet (one-time)
 npm run setup
 
-# 5. Run one allocation cycle (SIM mode — no dUSDC needed)
+# 5. Run one allocation cycle (SIM mode — devInspect only, no funds moved)
 npm run cycle
 
-# 6. Backtest 500 oracles
-npm run simulate
+# 6. Launch dashboard
+npm run dashboard          # → http://localhost:3002
 
-# 7. Launch dashboard
-npm run dashboard
-# → http://localhost:3002
+# 7. Supply liquidity manually (validates via devInspect first)
+npm run lp-supply -- 200            # dry-run
+npm run lp-supply -- 200 --execute  # live
 ```
 
-**Live execution** — set `LIVE_MODE=true` in `.env` and ensure dUSDC is in your wallet (request via the [Mysten Labs Tally form](https://docs.sui.io/onchain-finance/deepbook-predict/contract-information)).
+**Autonomous operation** — `npm run watcher` (or via pm2) runs the LP engine + sleeve every 60s. Set `LIVE_MODE=true` in `.env` to execute on testnet (request dUSDC via the [Mysten Labs Tally form](https://docs.sui.io/onchain-finance/deepbook-predict/contract-information)).
 
-**Live execution confirmed on Sui testnet:**
-- Deposit + Mint: [`4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a`](https://suiexplorer.com/txblock/4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a?network=testnet)
-- Redeem: [`CPgpMmBzMQaubWBSFm1SZqzDfiyoL4MM7Li9t8MmY3f7`](https://suiexplorer.com/txblock/CPgpMmBzMQaubWBSFm1SZqzDfiyoL4MM7Li9t8MmY3f7?network=testnet)
+**Representative live transactions (Sui testnet):**
+- LP supply: [`6RCL69MDBKb9YhFmcPDmPVNf3THrZf3XaxmVrKmDT4Xz`](https://suiexplorer.com/txblock/6RCL69MDBKb9YhFmcPDmPVNf3THrZf3XaxmVrKmDT4Xz?network=testnet)
+- LP supply: [`CznuJcDuA8dGL7p4FeizQTmBJdr5PjFWH2dircR8YiAw`](https://suiexplorer.com/txblock/CznuJcDuA8dGL7p4FeizQTmBJdr5PjFWH2dircR8YiAw?network=testnet)
+- Directional mint (sleeve): [`4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a`](https://suiexplorer.com/txblock/4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a?network=testnet)
 
-**Train / retrain the ML model:**
+---
+
+## How the LP risk gate works
+
+```
+exposure factor  = base(vol) × ml_adjust(conviction)
+   base:   vol < 15%  → 1.0   (calm — full exposure)
+           15–30%     → 0.6   (elevated — partial)
+           ≥ 30%      → 0.0   (extreme — stop adding)
+   ml_adjust = 1 − 0.3 × |prob_up − 0.5|×2   (strong conviction trims up to 30%)
+
+LP target = 70% of total capital × exposure factor   (hard cap 5,000 dUSDC)
+```
+
+Sticky: the engine only **adds** toward target (never force-exits), sourcing from the wallet first, then the Manager. A directional position is opened only when vol < 15% **and** ML confidence is high, hard-capped per position and per cycle.
+
+---
+
+## ML model
+
+A logistic regression predicts settlement direction (UP/DOWN) from 12 features: realized volatility, price trend, momentum, range, basis (forward−spot), time-of-day, day-of-week, and interaction terms.
+
+- **CV accuracy: ~63%** (5-fold, vs 50% random baseline)
+- Retrained automatically as new oracles settle (3,400+ to date) via `watcher.ts`
+- Weights exported to `scripts/model_weights.json`, loaded at inference in `src/ml-model.ts`
+- Used as a **defensive risk signal** for LP exposure; directional betting is the small capped sleeve only
+
 ```bash
-npm run collect    # fetch all settled oracles → scripts/training_data.csv
+npm run collect    # fetch settled oracles → scripts/training_data.csv
 npm run train      # train logistic regression → scripts/model_weights.json
-npm run retrain    # incremental collect + retrain in one command
+npm run retrain    # incremental collect + retrain
 ```
 
 ---
@@ -91,22 +125,23 @@ npm run retrain    # incremental collect + retrain in one command
 
 ```
 src/
-├── config.ts         # All contract addresses and scaling constants
-├── indexer.ts        # predict-server API (oracles, prices, managers)
-├── features.ts       # Market features from price history (vol, trend, basis)
-├── model.ts          # hermes3 allocation brain via Ollama
-├── transactions.ts   # PTB builders (deposit+mint, supply, redeem, preview)
-├── coins.ts          # dUSDC coin merge/split utilities
-├── wallet.ts         # Sign, execute, inspect transactions
-├── cycle.ts          # Main vault cycle loop (SIM + LIVE modes)
-├── simulate.ts       # 500-oracle backtest engine
-├── dashboard.ts      # Express dashboard (port 3002)
-├── first-trade.ts    # First live trade script (validates PTB then executes)
-└── redeem.ts         # Redeem settled positions
+├── config.ts          # Contract addresses, scaling, LP + sizing policy
+├── indexer.ts         # predict-server API (retry-hardened)
+├── features.ts        # Market features from price history
+├── ml-model.ts        # Trained logistic-regression inference (risk signal)
+├── model.ts           # hermes3 sizing + reasoning for the directional sleeve
+├── transactions.ts    # PTB builders (supply, supply-from-manager, mint, redeem, preview)
+├── coins.ts           # dUSDC / PLP coin utilities
+├── wallet.ts          # Sign, execute, devInspect
+├── cycle.ts           # LP engine (primary) + directional sleeve (secondary)
+├── watcher.ts         # Autonomous 60s loop
+├── lp-supply.ts       # Manual LP supply (devInspect-then-execute)
+├── daily-summary.ts   # Hourly P&L summary
+├── simulate.ts        # Backtest engine
+└── dashboard.ts       # Express dashboard (port 3002)
 logs/
-├── cycles.jsonl      # Cycle-by-cycle allocation log
-├── cycle-history.json
-└── simulation.json   # Full backtest results with equity curves
+├── cycles.jsonl       # Per-cycle log (LP factor, target, action, digests)
+└── daily-summary.json # Rolling P&L summary
 ```
 
 ---
@@ -120,43 +155,6 @@ logs/
 | Registry | `0x43af14fed5480c20ff77e2263d5f794c35b9fab7e2212903127062f4fe2a6e64` |
 | dUSDC | `0xe95040085976bfd54a1a07225cd46c8a2b4e8e2b6732f140a0fc49850ba73e1a::dusdc::DUSDC` |
 | PLP | `0xf5ea2b...::plp::PLP` |
-
----
-
-## ML model
-
-A logistic regression trained on **3,133 settled BTC oracle outcomes** predicts settlement direction (UP/DOWN) from 12 features: realized volatility, price trend, momentum, range, basis (forward−spot), time-of-day, day-of-week, and interaction terms.
-
-- **CV accuracy: 63.2%** (5-fold, vs 50% random baseline — +13.2pp edge)
-- Trained on **5,467 settled oracle outcomes** — grows automatically as new oracles settle
-- Gradient boosting also tested (similar accuracy) — LR selected for simplicity of TypeScript export
-- Model retrained automatically every 50 new oracle settlements via `watcher.ts`
-- Weights exported to `scripts/model_weights.json` and loaded at inference time in `src/ml-model.ts`
-
-## Allocation model
-
-The allocation brain is two-layer: the ML model provides the directional signal, hermes3 (via Ollama) decides sizing and generates the natural-language reasoning displayed on the dashboard.
-
-The hermes3 prompt receives each cycle:
-- BTC spot price, forward, time to expiry
-- Realized volatility and price trend from the last 20 oracle price events
-- Current manager balance and realized P&L
-- Last 5 cycle outcomes
-
-It outputs a structured JSON allocation decision:
-```json
-{
-  "reasoning": "BTC trending up with low vol — UP position near ATM",
-  "supply_usdc": 0,
-  "positions": [
-    { "type": "up", "strike": 71000, "quantity_usdc": 5.0 }
-  ],
-  "confidence": "high",
-  "skip": false
-}
-```
-
-Safety rails: max 70% of balance deployed per cycle, min 3 min to expiry to enter, skip if vol > 15%.
 
 ---
 
