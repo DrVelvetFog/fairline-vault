@@ -20,6 +20,7 @@ import { decide, ping, AllocationDecision, CycleContext } from './model.js';
 import { predict as mlPredict, formatPrediction } from './ml-model.js';
 import {
   buildDepositAndMint, buildDepositAndMintRange, buildSupply,
+  buildMint, buildGetTradeAmounts,
 } from './transactions.js';
 import { getDusdcCoins, getPlpCoins, formatBalance } from './coins.js';
 import { execute, inspect, getAddress } from './wallet.js';
@@ -76,45 +77,98 @@ function saveHistory(entry: CycleLog) {
 
 // ── Execution ─────────────────────────────────────────────────────────────────
 
+/** Preview the exact mint cost of a binary position via devInspect (free, no gas). */
+async function previewMintCost(
+  oracleId: string,
+  expiry:   bigint,
+  strike:   bigint,
+  isUp:     boolean,
+  quantity: bigint,
+): Promise<bigint | null> {
+  try {
+    const previewTx = buildGetTradeAmounts(oracleId, expiry, strike, isUp, quantity);
+    const preview   = await inspect(previewTx) as any;
+    const tradeVals = preview?.results?.[1]?.returnValues ?? [];
+    if (tradeVals.length >= 1) {
+      return Buffer.from(tradeVals[0][0]).readBigUInt64LE(0);
+    }
+  } catch (err) {
+    console.log(`  [warn] cost preview failed: ${String(err).slice(0, 80)}`);
+  }
+  return null;
+}
+
 async function executeDecision(
-  decision:  AllocationDecision,
-  oracleId:  string,
-  expiry:    bigint,
+  decision:     AllocationDecision,
+  oracleId:     string,
+  expiry:       bigint,
+  managerBalRaw: bigint,
 ): Promise<string[]> {
   const digests: string[] = [];
   const address = getAddress();
-  const { coins } = await getDusdcCoins(address);
+  const { coins, totalRaw } = await getDusdcCoins(address);
 
-  // ── Supply PLP ──────────────────────────────────────────────────────────────
+  // Mutable ledgers tracked across multiple actions in one cycle.
+  let availMgr    = managerBalRaw;  // Manager balance usable to fund mints
+  let availWallet = totalRaw;       // wallet dUSDC usable for PLP supply + deposit shortfalls
+
+  // ── Supply PLP (sourced from wallet) ──────────────────────────────────────────
   if (decision.supply_usdc >= 1.0) {
-    const supplyRaw = humanToDusdc(decision.supply_usdc);
-    console.log(`  supply ${decision.supply_usdc} dUSDC → PLP`);
-    const tx = buildSupply(coins, supplyRaw, address);
-    if (LIVE_MODE) {
-      const r = await execute(tx);
-      digests.push(r.digest);
-      console.log(`  ✓ supply ${r.digest}`);
+    const wantRaw   = humanToDusdc(decision.supply_usdc);
+    const supplyRaw = wantRaw <= availWallet ? wantRaw : availWallet;
+    if (supplyRaw < humanToDusdc(1)) {
+      console.log(`  ⏭  skip PLP supply — wallet has ${(Number(availWallet) / Number(DUSDC_SCALE)).toFixed(4)} dUSDC, can't fund (needs wallet liquidity)`);
     } else {
-      await inspect(tx);
-      console.log(`  [sim] supply PTB valid`);
+      if (supplyRaw < wantRaw) {
+        console.log(`  ⚠  capping PLP supply ${decision.supply_usdc} → ${(Number(supplyRaw) / Number(DUSDC_SCALE)).toFixed(4)} dUSDC (wallet-limited)`);
+      }
+      console.log(`  supply ${(Number(supplyRaw) / Number(DUSDC_SCALE)).toFixed(4)} dUSDC → PLP`);
+      const tx = buildSupply(coins, supplyRaw, address);
+      if (LIVE_MODE) {
+        const r = await execute(tx);
+        digests.push(r.digest);
+        availWallet -= supplyRaw;
+        console.log(`  ✓ supply ${r.digest}`);
+      } else {
+        await inspect(tx);
+        console.log(`  [sim] supply PTB valid`);
+      }
     }
   }
 
   // ── Mint positions ──────────────────────────────────────────────────────────
   for (const pos of decision.positions) {
-    const qty        = humanToDusdc(pos.quantity_usdc);
-    // Deposit = full quantity as max-possible cost (any leftover stays in manager)
-    const depositRaw = qty;
+    const qty = humanToDusdc(pos.quantity_usdc);
 
+    // ── Binary (up/down): fund from Manager balance, deposit only the shortfall ──
     if (pos.type === 'up' || pos.type === 'down') {
       const strike = BigInt(Math.round(pos.strike!)) * 1_000_000_000n;
-      console.log(`  mint ${pos.type.toUpperCase()} strike=$${pos.strike} qty=${pos.quantity_usdc} dUSDC`);
-      const tx = buildDepositAndMint(
-        MANAGER_ID, coins, depositRaw, oracleId, expiry, strike, pos.type === 'up', qty,
-      );
+      const isUp   = pos.type === 'up';
+
+      // Real cost from the protocol; fall back to full qty (max possible cost) if preview fails.
+      const cost     = await previewMintCost(oracleId, expiry, strike, isUp, qty) ?? qty;
+      const shortfall = cost > availMgr ? cost - availMgr : 0n;
+      const costH     = (Number(cost) / Number(DUSDC_SCALE)).toFixed(4);
+
+      if (shortfall > availWallet) {
+        console.log(`  ⏭  skip mint ${pos.type.toUpperCase()} — cost ${costH}, manager ${(Number(availMgr) / Number(DUSDC_SCALE)).toFixed(4)} + wallet ${(Number(availWallet) / Number(DUSDC_SCALE)).toFixed(4)} insufficient`);
+        continue;
+      }
+
+      let tx;
+      if (shortfall === 0n) {
+        console.log(`  mint ${pos.type.toUpperCase()} strike=$${pos.strike} qty=${pos.quantity_usdc} (cost ${costH}, from manager)`);
+        tx = buildMint(MANAGER_ID, oracleId, expiry, strike, isUp, qty);
+      } else {
+        console.log(`  mint ${pos.type.toUpperCase()} strike=$${pos.strike} qty=${pos.quantity_usdc} (cost ${costH}, deposit ${(Number(shortfall) / Number(DUSDC_SCALE)).toFixed(4)} from wallet)`);
+        tx = buildDepositAndMint(MANAGER_ID, coins, shortfall, oracleId, expiry, strike, isUp, qty);
+      }
+
       if (LIVE_MODE) {
         const r = await execute(tx);
         digests.push(r.digest);
+        availWallet -= shortfall;
+        availMgr     = availMgr + shortfall - cost;  // → max(0, availMgr - cost)
         console.log(`  ✓ mint ${r.digest}`);
       } else {
         await inspect(tx);
@@ -122,9 +176,15 @@ async function executeDecision(
       }
     }
 
+    // ── Range: keep deposit-full-qty path (rarely used; conservative + unchanged) ─
     if (pos.type === 'range') {
       const lower  = BigInt(Math.round(pos.lower_strike!))  * 1_000_000_000n;
       const higher = BigInt(Math.round(pos.higher_strike!)) * 1_000_000_000n;
+      const depositRaw = qty > availWallet ? availWallet : qty;
+      if (depositRaw < qty) {
+        console.log(`  ⏭  skip RANGE — wallet ${(Number(availWallet) / Number(DUSDC_SCALE)).toFixed(4)} < qty ${pos.quantity_usdc}`);
+        continue;
+      }
       console.log(`  mint RANGE $${pos.lower_strike}–$${pos.higher_strike} qty=${pos.quantity_usdc} dUSDC`);
       const tx = buildDepositAndMintRange(
         MANAGER_ID, coins, depositRaw, oracleId, expiry, lower, higher, qty,
@@ -132,6 +192,7 @@ async function executeDecision(
       if (LIVE_MODE) {
         const r = await execute(tx);
         digests.push(r.digest);
+        availWallet -= depositRaw;
         console.log(`  ✓ mint_range ${r.digest}`);
       } else {
         await inspect(tx);
@@ -270,7 +331,10 @@ export async function runCycle(): Promise<void> {
       console.log('\n  [sim] No dUSDC coins — skipping devInspect (tokens not yet received)');
     } else {
       try {
-        digests = await executeDecision(decision, oracle.oracle_id, BigInt(oracle.expiry));
+        digests = await executeDecision(
+          decision, oracle.oracle_id, BigInt(oracle.expiry),
+          BigInt(Math.max(0, Math.floor(managerBal))),
+        );
       } catch (err) {
         execError = String(err);
         console.error('  Error:', execError);

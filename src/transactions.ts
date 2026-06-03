@@ -170,6 +170,38 @@ export function buildDepositAndMintRange(
   return tx;
 }
 
+// ── Mint from Manager balance (no wallet deposit) ──────────────────────────────
+
+/**
+ * Mint a binary position funded entirely from the Manager's existing balance.
+ * No wallet deposit — cost is withdrawn from the manager internally.
+ * Use when the manager already holds enough dUSDC to cover the mint cost.
+ */
+export function buildMint(
+  managerId: string,
+  oracleId:  string,
+  expiry:    bigint,
+  strike:    bigint,
+  isUp:      boolean,
+  quantity:  bigint,
+): Transaction {
+  const tx  = new Transaction();
+  const key = mkMarketKey(tx, oracleId, expiry, strike, isUp);
+  tx.moveCall({
+    target:        `${PKG}::predict::mint`,
+    typeArguments: [DUSDC_TYPE],
+    arguments: [
+      tx.object(PRED),
+      tx.object(managerId),
+      tx.object(oracleId),
+      key,
+      tx.pure.u64(quantity),
+      tx.object(CLOCK),
+    ],
+  });
+  return tx;
+}
+
 // ── Supply (PLP) ──────────────────────────────────────────────────────────────
 
 /**
