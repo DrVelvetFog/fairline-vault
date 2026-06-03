@@ -10,6 +10,7 @@
  */
 
 import 'dotenv/config';
+import type { CoinStruct } from '@mysten/sui/client';
 import {
   getNearestActiveOracle, getPriceHistory, getLatestPrice, getManagerSummary,
   getManagerPositions, ManagerPosition,
@@ -20,13 +21,15 @@ import { decide, ping, AllocationDecision, CycleContext } from './model.js';
 import { predict as mlPredict, formatPrediction } from './ml-model.js';
 import {
   buildDepositAndMint, buildDepositAndMintRange, buildSupply,
-  buildMint, buildGetTradeAmounts,
+  buildMint, buildGetTradeAmounts, buildSupplyFromManager, buildWithdrawLiquidity,
 } from './transactions.js';
 import { getDusdcCoins, getPlpCoins, formatBalance } from './coins.js';
 import { execute, inspect, getAddress } from './wallet.js';
+import { MLPrediction } from './ml-model.js';
 import {
   MANAGER_ID, DUSDC_SCALE, MAX_PLP_DUSDC,
   HIGH_VOL_THRESHOLD, EXTREME_VOL_THRESHOLD,
+  LP_TARGET_PCT, LP_REBALANCE_BAND,
   humanToDusdc, PREDICT_PACKAGE,
 } from './config.js';
 import * as fs from 'fs';
@@ -48,6 +51,13 @@ interface CycleLog {
   tx_digests: string[];
   sim_only:   boolean;
   error?:     string;
+  lp?: {
+    factor:  number;
+    target:  number;
+    current: number;
+    delta:   number;
+    action:  string;
+  };
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
@@ -76,6 +86,29 @@ function saveHistory(entry: CycleLog) {
 }
 
 // ── Execution ─────────────────────────────────────────────────────────────────
+
+/**
+ * LP exposure factor in [0,1] — how much of the LP target to actually hold.
+ *
+ * LP's only real risk is a large directional move (the vault is the house, so it
+ * loses when traders win big). So we gate exposure on directional risk:
+ *   - calm vol            → full exposure
+ *   - elevated vol        → reduced
+ *   - extreme vol         → full pullback (exit liquidity from harm's way)
+ * and we further trim when the ML model is highly convicted on a direction
+ * (a strong predicted move = higher directional risk to the house).
+ */
+export function computeLpExposureFactor(vol: number, ml: MLPrediction): number {
+  let base: number;
+  if (vol >= EXTREME_VOL_THRESHOLD)   base = 0.0;   // extreme — pull out entirely
+  else if (vol >= HIGH_VOL_THRESHOLD) base = 0.6;   // elevated — partial
+  else                                base = 1.0;   // calm — full
+
+  // ML conviction: |prob-0.5|×2 ∈ [0,1]; strong conviction trims up to 30%.
+  const conviction = Math.min(1, Math.abs(ml.prob_up - 0.5) * 2);
+  const mlAdjust   = 1 - 0.3 * conviction;
+  return base * mlAdjust;
+}
 
 /** Preview the exact mint cost of a binary position via devInspect (free, no gas). */
 async function previewMintCost(
@@ -204,6 +237,55 @@ async function executeDecision(
   return digests;
 }
 
+/**
+ * Rebalance the LP position toward target.
+ *  - extreme vol → withdraw all PLP (full pullback)
+ *  - under target by > band → supply the gap from the Manager balance
+ *  - otherwise → hold (no churn)
+ */
+async function rebalanceLP(
+  lpDelta:       number,        // human dUSDC: + supply more, - over target
+  vol:           number,
+  currentPlp:    number,
+  managerBalRaw: bigint,
+  plpCoins:      CoinStruct[],
+): Promise<{ digests: string[]; action: string }> {
+  const digests: string[] = [];
+  const address = getAddress();
+
+  // Full pullback in extreme vol — exit liquidity from harm's way.
+  if (vol >= EXTREME_VOL_THRESHOLD && currentPlp > LP_REBALANCE_BAND) {
+    console.log(`  [LP] extreme vol ${vol.toFixed(1)}% — pulling all liquidity (${currentPlp.toFixed(1)} dUSDC PLP)`);
+    for (const c of plpCoins) {
+      const tx = buildWithdrawLiquidity(c.coinObjectId, address);
+      if (LIVE_MODE) { const r = await execute(tx); digests.push(r.digest); console.log(`  ✓ withdraw ${r.digest}`); }
+      else           { await inspect(tx);            console.log(`  [sim] withdraw PTB valid`); }
+    }
+    return { digests, action: 'pullback' };
+  }
+
+  // Supply toward target, funded directly from the Manager balance.
+  if (lpDelta > LP_REBALANCE_BAND) {
+    const wantRaw   = humanToDusdc(lpDelta);
+    const supplyRaw = wantRaw <= managerBalRaw ? wantRaw : managerBalRaw;
+    if (supplyRaw < humanToDusdc(1)) {
+      console.log(`  [LP] manager balance too low to supply (${(Number(managerBalRaw) / Number(DUSDC_SCALE)).toFixed(2)} dUSDC)`);
+      return { digests, action: 'none' };
+    }
+    if (supplyRaw < wantRaw) {
+      console.log(`  [LP] capping supply ${lpDelta.toFixed(1)} → ${(Number(supplyRaw) / Number(DUSDC_SCALE)).toFixed(1)} dUSDC (manager-limited)`);
+    }
+    console.log(`  [LP] supplying ${(Number(supplyRaw) / Number(DUSDC_SCALE)).toFixed(1)} dUSDC → PLP (from manager)`);
+    const tx = buildSupplyFromManager(MANAGER_ID, supplyRaw, address);
+    if (LIVE_MODE) { const r = await execute(tx); digests.push(r.digest); console.log(`  ✓ supply ${r.digest}`); }
+    else           { await inspect(tx);            console.log(`  [sim] supply-from-manager PTB valid`); }
+    return { digests, action: 'supply' };
+  }
+
+  console.log(`  [LP] within band — holding`);
+  return { digests, action: 'hold' };
+}
+
 // ── Main cycle ────────────────────────────────────────────────────────────────
 
 export async function runCycle(): Promise<void> {
@@ -225,13 +307,12 @@ export async function runCycle(): Promise<void> {
   const minsLeft = (oracle.expiry - Date.now()) / 60_000;
   console.log(`Oracle: ${oracle.oracle_id.slice(0, 12)}… expiry in ${minsLeft.toFixed(1)} min`);
 
-  // Guard: skip if we already have an open position in this oracle
+  // The LP engine rebalances every tick regardless. This flag only gates the
+  // directional sleeve: at most one directional position per oracle.
   const existingPositions = await getManagerPositions(MANAGER_ID);
   const alreadyEntered = existingPositions.minted.some(p => p.oracle_id === oracle.oracle_id);
   if (alreadyEntered) {
-    console.log(`Already entered oracle ${oracle.oracle_id.slice(0, 12)}… — waiting for settlement.`);
-    console.log('━━━ done (idle) ━━━\n');
-    return;
+    console.log(`Note: directional position already open in this oracle — sleeve will hold.`);
   }
 
   const [prices, latest, summary, dusdcBal, plpCoins] = await Promise.all([
@@ -270,74 +351,63 @@ export async function runCycle(): Promise<void> {
   const mlPrediction = mlPredict(features);
   console.log(`ML model: ${formatPrediction(mlPrediction)}`);
 
-  // ── Vol guard — bypass hermes3 above volatility thresholds ─────────────────
   const vol = features.realized_vol_pct;
-  const plpHeadroom = Math.max(0, MAX_PLP_DUSDC - currentPlp);
+  const managerBalRaw = BigInt(Math.max(0, Math.floor(managerBal)));
 
-  let decision: AllocationDecision;
-
-  if (vol >= EXTREME_VOL_THRESHOLD) {
-    // Too volatile — market is a coin flip, ML signal unreliable, skip entirely
-    console.log(`  [vol-guard] ⚡ vol=${vol.toFixed(1)}% ≥ ${EXTREME_VOL_THRESHOLD}% — SKIP (too volatile)`);
-    decision = {
-      reasoning:   `Vol ${vol.toFixed(1)}% is extreme — ML signal unreliable, sitting out`,
-      supply_usdc: 0, positions: [], confidence: 'low',
-      skip: true, skip_reason: `extreme vol (${vol.toFixed(1)}%)`,
-    };
-  } else if (vol >= HIGH_VOL_THRESHOLD) {
-    // High vol — wide spread favours LP; supply to PLP if headroom, else skip
-    if (plpHeadroom >= 1) {
-      const supplyAmt = Math.min(plpHeadroom, totalH * 0.3);
-      console.log(`  [vol-guard] ⚡ vol=${vol.toFixed(1)}% ≥ ${HIGH_VOL_THRESHOLD}% — supplying ${supplyAmt.toFixed(1)} dUSDC to PLP (bypassing hermes3)`);
-      decision = {
-        reasoning:   `Vol ${vol.toFixed(1)}% is high — wide spread favours PLP, not direction`,
-        supply_usdc: supplyAmt, positions: [], confidence: 'medium', skip: false,
-      };
-    } else {
-      console.log(`  [vol-guard] ⚡ vol=${vol.toFixed(1)}% ≥ ${HIGH_VOL_THRESHOLD}% — PLP at cap, SKIP`);
-      decision = {
-        reasoning:   `Vol ${vol.toFixed(1)}% is high but PLP at cap — skipping`,
-        supply_usdc: 0, positions: [], confidence: 'low',
-        skip: true, skip_reason: `high vol + PLP full`,
-      };
-    }
-  } else {
-    // Normal vol — pass to hermes3 with ML signal
-    ctx.ml_prediction = mlPrediction;
-    console.log('Asking hermes3…');
-    decision = await decide(ctx);
-  }
-
-  console.log(`\nDecision (${decision.confidence} confidence):`);
-  console.log(`  ${decision.reasoning}`);
-  if (decision.skip) {
-    console.log(`  SKIP: ${decision.skip_reason}`);
-  } else {
-    if (decision.supply_usdc > 0) console.log(`  Supply PLP : ${decision.supply_usdc} dUSDC`);
-    for (const p of decision.positions) {
-      if (p.type === 'range')
-        console.log(`  Range      : $${p.lower_strike}–$${p.higher_strike}  qty=${p.quantity_usdc} dUSDC`);
-      else
-        console.log(`  ${p.type.toUpperCase().padEnd(4)}       : strike=$${p.strike}  qty=${p.quantity_usdc} dUSDC`);
-    }
-  }
-
-  // 4. Execute or sim
   let digests: string[] = [];
   let execError: string | undefined;
 
-  if (!decision.skip) {
+  // ── PRIMARY: ML/vol-gated liquidity provision ──────────────────────────────
+  const lpFactor = computeLpExposureFactor(vol, mlPrediction);
+  const lpTarget = Math.min(totalH * LP_TARGET_PCT * lpFactor, MAX_PLP_DUSDC);
+  const lpDelta  = lpTarget - currentPlp;
+  console.log(`\n[LP engine] exposure factor ${lpFactor.toFixed(2)} → target ${lpTarget.toFixed(1)} dUSDC | current ${currentPlp.toFixed(1)} | delta ${lpDelta >= 0 ? '+' : ''}${lpDelta.toFixed(1)}`);
+
+  let lpAction = 'hold';
+  try {
+    const lp = await rebalanceLP(lpDelta, vol, currentPlp, managerBalRaw, plpCoins);
+    digests.push(...lp.digests);
+    lpAction = lp.action;
+  } catch (err) {
+    execError = String(err);
+    console.error('  [LP] error:', execError);
+  }
+
+  // ── SECONDARY: small, capped, experimental directional sleeve ──────────────
+  // Only when the market is calm AND the ML model is highly convicted. Bets are
+  // hard-capped (MAX_POSITION_USDC / MAX_CYCLE_USDC) — this is research, not the
+  // income engine. In any other regime the sleeve sits idle.
+  let decision: AllocationDecision = {
+    reasoning:   `directional sleeve idle (vol ${vol.toFixed(1)}%, ML ${mlPrediction.confidence})`,
+    supply_usdc: 0, positions: [], confidence: 'low', skip: true,
+    skip_reason: 'sleeve idle',
+  };
+
+  if (vol < HIGH_VOL_THRESHOLD && mlPrediction.confidence === 'high' && !alreadyEntered) {
+    ctx.ml_prediction = mlPrediction;
+    console.log('\n[sleeve] calm + high-confidence ML — consulting hermes3 (capped)…');
+    decision = await decide(ctx);
+    decision.supply_usdc = 0;  // LP is handled by the engine above; sleeve is directional only
+  } else {
+    const why = alreadyEntered ? 'position already open this oracle'
+      : vol >= HIGH_VOL_THRESHOLD ? `vol ${vol.toFixed(1)}% not calm`
+      : `ML confidence ${mlPrediction.confidence}`;
+    console.log(`\n[sleeve] idle — ${why}`);
+  }
+
+  if (!decision.skip && decision.positions.length > 0) {
+    console.log(`  ${decision.reasoning}`);
     if (!LIVE_MODE && dusdcBal.coins.length === 0) {
-      console.log('\n  [sim] No dUSDC coins — skipping devInspect (tokens not yet received)');
+      console.log('  [sim] No dUSDC coins — skipping devInspect');
     } else {
       try {
-        digests = await executeDecision(
-          decision, oracle.oracle_id, BigInt(oracle.expiry),
-          BigInt(Math.max(0, Math.floor(managerBal))),
+        const sleeveDigests = await executeDecision(
+          decision, oracle.oracle_id, BigInt(oracle.expiry), managerBalRaw,
         );
+        digests.push(...sleeveDigests);
       } catch (err) {
-        execError = String(err);
-        console.error('  Error:', execError);
+        execError = (execError ? execError + ' | ' : '') + String(err);
+        console.error('  [sleeve] error:', String(err));
       }
     }
   }
@@ -350,6 +420,7 @@ export async function runCycle(): Promise<void> {
     features: features as unknown as Record<string, unknown>,
     decision, executed: digests.length > 0,
     tx_digests: digests, sim_only: !LIVE_MODE, error: execError,
+    lp: { factor: lpFactor, target: lpTarget, current: currentPlp, delta: lpDelta, action: lpAction },
   };
   appendLog(entry);
   saveHistory(entry);

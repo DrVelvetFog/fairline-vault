@@ -20,8 +20,19 @@ export const PLP_TYPE = `${PREDICT_PACKAGE}::plp::PLP`;
 
 // ── Vault policy ─────────────────────────────────────────────────────────────
 
-// Maximum dUSDC that may sit in PLP at any time.
-export const MAX_PLP_DUSDC = 500;
+// ── Liquidity provision (primary strategy) ───────────────────────────────────
+// FairLine is LP-primary: it earns the vault's house edge by supplying PLP,
+// and uses the ML/vol signal defensively to gate that exposure (LP's only real
+// risk is a large directional move). Directional bets are a small capped sleeve.
+
+// Target share of total capital to hold in PLP under normal conditions.
+export const LP_TARGET_PCT  = 0.70;
+
+// Absolute ceiling on PLP exposure (hard safety cap, dUSDC).
+export const MAX_PLP_DUSDC  = 5000;
+
+// Only rebalance LP when the target/current gap exceeds this (dUSDC) — avoids churn.
+export const LP_REBALANCE_BAND = 20;
 
 // Volatility thresholds — bypass hermes3 above these levels.
 // 15-30%: supply to PLP (wide spread = LP earns more); >30%: skip entirely.

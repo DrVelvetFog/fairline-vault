@@ -226,6 +226,35 @@ export function buildSupply(
   return tx;
 }
 
+/**
+ * Supply dUSDC to PLP sourced directly from the Manager's balance — one PTB.
+ * Withdraws `amountRaw` from the Manager (returns a Coin<dUSDC>), supplies it to
+ * the vault, and transfers the resulting PLP back to the sender. Lets idle
+ * Manager capital be deployed as liquidity without a separate wallet round-trip.
+ */
+export function buildSupplyFromManager(
+  managerId: string,
+  amountRaw: bigint,
+  sender:    string,
+): Transaction {
+  const tx = new Transaction();
+
+  const coin = tx.moveCall({
+    target:        `${PKG}::predict_manager::withdraw`,
+    typeArguments: [DUSDC_TYPE],
+    arguments:     [tx.object(managerId), tx.pure.u64(amountRaw)],
+  });
+
+  const plpCoin = tx.moveCall({
+    target:        `${PKG}::predict::supply`,
+    typeArguments: [DUSDC_TYPE],
+    arguments:     [tx.object(PRED), coin, tx.object(CLOCK)],
+  });
+
+  tx.transferObjects([plpCoin], sender);
+  return tx;
+}
+
 // ── Withdraw PLP ──────────────────────────────────────────────────────────────
 
 /**
