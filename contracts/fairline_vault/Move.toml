@@ -1,0 +1,10 @@
+[package]
+name = "fairline_vault"
+edition = "2024.beta"
+license = "MIT"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+fairline_vault = "0x0"

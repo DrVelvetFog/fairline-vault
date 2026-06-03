@@ -16,3 +16,6 @@ logs/retrain-state.json
 
 # One-off utility scripts
 src/redeem-plp.ts
+
+# Move build artifacts
+contracts/**/build/
