@@ -33,6 +33,12 @@ export const MIN_POSITION_PCT   = 0.01;  // 1%  — floor enforced in parseDecis
 export const MAX_POSITION_PCT   = 0.05;  // 5%  — per-position ceiling
 export const MAX_CYCLE_DEPLOY   = 0.15;  // 15% — total per cycle (3 × 5%)
 
+// Absolute risk caps (dUSDC). These bound sizing regardless of balance, so bet
+// size never scales off trapped/idle Manager capital. Effective size is
+// min(% of balance, these caps). Tighten/loosen to change live risk exposure.
+export const MAX_POSITION_USDC  = 15;    // hard ceiling per position
+export const MAX_CYCLE_USDC     = 45;    // hard ceiling per cycle
+
 // ── Scaling ──────────────────────────────────────────────────────────────────
 
 // Oracle prices and strikes: 1e9 float scaling (DeepBook math convention)

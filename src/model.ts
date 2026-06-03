@@ -10,7 +10,10 @@
 
 import { MarketFeatures } from './features.js';
 import { predict as mlPredict, formatPrediction, MLPrediction } from './ml-model.js';
-import { MIN_POSITION_PCT, MAX_POSITION_PCT, MAX_CYCLE_DEPLOY } from './config.js';
+import {
+  MIN_POSITION_PCT, MAX_POSITION_PCT, MAX_CYCLE_DEPLOY,
+  MAX_POSITION_USDC, MAX_CYCLE_USDC,
+} from './config.js';
 
 const OLLAMA_URL  = 'http://127.0.0.1:11434';
 const MODEL       = 'hermes3:latest';
@@ -93,12 +96,13 @@ OUTPUT: Return ONLY valid JSON, no other text. Schema:
 
 function buildUserPrompt(ctx: CycleContext): string {
   const f = ctx.features;
-  const deployable = Math.floor(ctx.balance_usdc * MAX_CYCLE_DEPLOY * 100) / 100;
+  // Bounded by absolute caps so targets never scale off idle/trapped balance.
+  const deployable = Math.floor(Math.min(ctx.balance_usdc * MAX_CYCLE_DEPLOY, MAX_CYCLE_USDC) * 100) / 100;
 
-  // Position size targets scaled to current balance
-  const sizeHigh = Math.floor(ctx.balance_usdc * MAX_POSITION_PCT * 100) / 100;
-  const sizeMed  = Math.floor(ctx.balance_usdc * (MAX_POSITION_PCT * 0.6) * 100) / 100;
-  const sizeLow  = Math.floor(ctx.balance_usdc * MIN_POSITION_PCT * 100) / 100;
+  // Position size targets scaled to balance, capped at the absolute per-position limit
+  const sizeHigh = Math.floor(Math.min(ctx.balance_usdc * MAX_POSITION_PCT, MAX_POSITION_USDC) * 100) / 100;
+  const sizeMed  = Math.floor(Math.min(ctx.balance_usdc * (MAX_POSITION_PCT * 0.6), MAX_POSITION_USDC) * 100) / 100;
+  const sizeLow  = Math.floor(Math.min(ctx.balance_usdc * MIN_POSITION_PCT, MAX_POSITION_USDC) * 100) / 100;
 
   // Snap ATM strike to nearest dollar
   const atm = Math.round(f.spot_usd);
@@ -120,7 +124,7 @@ Basis          : ${f.basis_bps.toFixed(1)} bps (forward vs spot)
 
 MANAGER STATE
 Balance        : ${ctx.balance_usdc.toFixed(2)} dUSDC
-Max deploy     : ${deployable.toFixed(2)} dUSDC (15% of balance per cycle)
+Max deploy     : ${deployable.toFixed(2)} dUSDC per cycle (min of 15% of balance and ${MAX_CYCLE_USDC} dUSDC cap)
 Realized P&L   : ${ctx.realized_pnl >= 0 ? '+' : ''}${ctx.realized_pnl.toFixed(4)} dUSDC
 PLP locked     : ${ctx.current_plp_usdc.toFixed(2)} / ${ctx.max_plp_usdc} dUSDC max  ← DO NOT supply if already at cap
 
@@ -190,9 +194,10 @@ function parseDecision(raw: string, ctx: CycleContext): AllocationDecision {
     };
   }
 
-  // Safety rails — never let model exceed deployable budget
-  const maxDeploy   = ctx.balance_usdc * MAX_CYCLE_DEPLOY;
-  const minPosition = Math.max(1.0, ctx.balance_usdc * MIN_POSITION_PCT);
+  // Safety rails — never let model exceed deployable budget.
+  // Absolute caps bound the percentage so sizing never scales off idle balance.
+  const maxDeploy   = Math.min(ctx.balance_usdc * MAX_CYCLE_DEPLOY, MAX_CYCLE_USDC);
+  const minPosition = Math.min(Math.max(1.0, ctx.balance_usdc * MIN_POSITION_PCT), MAX_POSITION_USDC);
   // Hard cap: can only supply up to (max_plp - current_plp), never over the limit
   const plpHeadroom = Math.max(0, ctx.max_plp_usdc - ctx.current_plp_usdc);
   const supply      = Math.min(parsed.supply_usdc ?? 0, maxDeploy, plpHeadroom);
@@ -208,7 +213,7 @@ function parseDecision(raw: string, ctx: CycleContext): AllocationDecision {
     if (spent >= maxDeploy) break;
     // Bump up any undersized position to the minimum, cap at remaining budget
     const rawQty = p.quantity_usdc ?? 0;
-    const qty    = Math.min(Math.max(rawQty, minPosition), maxDeploy - spent);
+    const qty    = Math.min(Math.max(rawQty, minPosition), MAX_POSITION_USDC, maxDeploy - spent);
     if (qty < 1.0) continue;
 
     // Validate strike fields
