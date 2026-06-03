@@ -31,6 +31,19 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },
     {
+      name:          'fairline-snapshot',
+      script:        'npx',
+      args:          'tsx src/accrual-snapshot.ts',
+      cwd:           __dirname,
+      interpreter:   'none',
+      autorestart:   false,           // one-shot job
+      cron_restart:  '*/15 * * * *',  // snapshot every 15 minutes
+      env:           {},
+      error_file:    'logs/snapshot-err.log',
+      out_file:      'logs/snapshot-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    },
+    {
       name:         'fairline-dashboard',
       script:       'npx',
       args:         'tsx src/dashboard.ts',

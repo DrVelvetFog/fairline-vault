@@ -154,6 +154,13 @@ app.get('/api/vault-state', async (_req: Request, res: Response) => {
   catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
+app.get('/api/accrual', (_req: Request, res: Response) => {
+  try {
+    const lines = fs.readFileSync(path.join(ROOT, 'logs/accrual.jsonl'), 'utf-8').trim().split('\n').filter(Boolean);
+    res.json(lines.slice(-200).map(l => JSON.parse(l)));
+  } catch { res.json([]); }
+});
+
 app.get('/api/cycles', (_req: Request, res: Response) => {
   res.json(readCycles(30));
 });
@@ -423,6 +430,12 @@ button:disabled{opacity:.5;cursor:not-allowed}
           <tbody id="cycles-table"><tr><td colspan="6" style="color:var(--muted)">No cycles yet</td></tr></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>House Edge Accrual <span style="font-size:10px;color:var(--muted)">PLP redemption rate over time</span></h2>
+      <canvas id="accrual-chart" style="width:100%;height:140px;display:block"></canvas>
+      <div id="accrual-empty" class="note" style="border:none">Accruing — chart fills as snapshots accumulate (run <span class="mono">npm run snapshot</span> on a cron).</div>
     </div>
   </div>
 
@@ -711,9 +724,32 @@ async function loadVaultState(){
   }catch(e){}
 }
 
+async function loadAccrual(){
+  let pts=[]; try{pts=await api('/api/accrual');}catch{}
+  const empty=document.getElementById('accrual-empty');
+  const canvas=document.getElementById('accrual-chart');
+  if(!pts||pts.length<2){empty.style.display='';return;}
+  empty.style.display='none';
+  const ctx=canvas.getContext('2d');
+  const W=canvas.clientWidth, H=140; canvas.width=W; canvas.height=H;
+  const vals=pts.map(p=>p.edge_pct);
+  const min=Math.min(...vals), max=Math.max(...vals), span=(max-min)||1;
+  const x=i=>i/(pts.length-1)*(W-8)+4;
+  const y=v=>H-8-((v-min)/span)*(H-20);
+  // area + line
+  ctx.beginPath();ctx.moveTo(x(0),y(vals[0]));
+  for(let i=1;i<vals.length;i++)ctx.lineTo(x(i),y(vals[i]));
+  ctx.strokeStyle='#3fd77a';ctx.lineWidth=2;ctx.stroke();
+  ctx.lineTo(x(vals.length-1),H);ctx.lineTo(x(0),H);ctx.closePath();
+  ctx.fillStyle='rgba(63,215,122,.10)';ctx.fill();
+  ctx.fillStyle='#7d8896';ctx.font='10px monospace';
+  ctx.fillText('+'+max.toFixed(3)+'%',4,12);
+  ctx.fillText(pts.length+' pts',W-46,12);
+}
+
 async function loadAll(){
   document.getElementById('hd-time').textContent=new Date().toLocaleTimeString();
-  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp(),loadVaultState()]);
+  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp(),loadVaultState(),loadAccrual()]);
   renderCapital();
 }
 

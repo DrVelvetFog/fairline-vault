@@ -19,3 +19,4 @@ src/redeem-plp.ts
 
 # Move build artifacts
 contracts/**/build/
+logs/accrual.jsonl
