@@ -15,6 +15,7 @@ import {
   getPriceHistory, PriceEvent,
 } from './indexer.js';
 import { getDusdcCoins, getPlpCoins } from './coins.js';
+import { getVaultState } from './vault.js';
 import { getAddress, client } from './wallet.js';
 import { MANAGER_ID, DUSDC_SCALE, priceToHuman, PREDICT_OBJECT } from './config.js';
 import { computeFeatures } from './features.js';
@@ -146,6 +147,11 @@ app.get('/api/plp', async (_req: Request, res: Response) => {
       lp_engine:        lp,   // { factor, target, current, delta, action }
     });
   } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.get('/api/vault-state', async (_req: Request, res: Response) => {
+  try { res.json(await getVaultState()); }
+  catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
 app.get('/api/cycles', (_req: Request, res: Response) => {
@@ -420,8 +426,21 @@ button:disabled{opacity:.5;cursor:not-allowed}
     </div>
   </div>
 
-  <!-- Right: ML risk gate + directional sleeve -->
+  <!-- Right: vault + ML risk gate + directional sleeve -->
   <div>
+    <div class="card glow">
+      <h2>🏦 FairLine Vault <span class="tag tag-primary">MULTI-USER</span></h2>
+      <div class="bigstat"><span class="num" id="v-tvl" style="font-size:28px">—</span><span class="unit">TVL (dUSDC)</span></div>
+      <div class="row"><span class="k">Share price (FLP)</span><span class="v" id="v-price">—</span></div>
+      <div class="row"><span class="k">FLP supply</span><span class="v" id="v-supply">—</span></div>
+      <div class="row"><span class="k">Idle reserve</span><span class="v" id="v-reserve">—</span></div>
+      <div class="row"><span class="k">Deployed to strategy</span><span class="v" id="v-deployed">—</span></div>
+      <div class="note">
+        On-chain share vault — anyone deposits dUSDC for FLP shares priced at NAV, withdraws pro-rata.
+        <span class="mono" id="v-addr">—</span>
+      </div>
+    </div>
+
     <div class="card">
       <h2>ML Risk Gate</h2>
       <div class="note" style="border:none;padding:0 0 10px;margin:0">A directional model used <strong style="color:var(--text)">defensively</strong> — it scales LP exposure down when a strong move is likely, not to place bets.</div>
@@ -679,9 +698,22 @@ async function loadPlp(){
   }catch(e){}
 }
 
+async function loadVaultState(){
+  try{
+    const d=await api('/api/vault-state');
+    document.getElementById('v-tvl').textContent=d.nav.toFixed(2);
+    document.getElementById('v-price').textContent=d.sharePrice.toFixed(6)+' dUSDC';
+    document.getElementById('v-price').style.color=d.sharePrice>=1?'var(--green)':'var(--red)';
+    document.getElementById('v-supply').textContent=d.totalShares.toFixed(2)+' FLP';
+    document.getElementById('v-reserve').textContent=d.reserve.toFixed(2)+' dUSDC';
+    document.getElementById('v-deployed').textContent=d.deployed.toFixed(2)+' dUSDC';
+    document.getElementById('v-addr').textContent='0x71a352…af04fb7e';
+  }catch(e){}
+}
+
 async function loadAll(){
   document.getElementById('hd-time').textContent=new Date().toLocaleTimeString();
-  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp()]);
+  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp(),loadVaultState()]);
   renderCapital();
 }
 
