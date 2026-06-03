@@ -42,13 +42,23 @@ async function deploy() {
   console.log(`Recorded lot. Total lots: ${lots.length}`);
 }
 
+// Skip a mark tx unless the NAV has moved by at least this much (dUSDC) — avoids
+// wasting gas re-marking sub-cent changes when run autonomously on a cron.
+const MARK_DEADBAND = 0.01;
+
 async function mark() {
   const lots = load();
   if (lots.length === 0) { console.log('No deployed lots to mark.'); return; }
-  const rate = await getPlpRate();
+  const [rate, state] = await Promise.all([getPlpRate(), getVaultState()]);
   const value = lots.reduce((s, l) => s + l.principal * rate / l.entryRate, 0);
   const principal = lots.reduce((s, l) => s + l.principal, 0);
-  console.log(`Lots principal ${principal.toFixed(2)} → current value ${value.toFixed(4)} dUSDC (rate ${rate.toFixed(6)}) | gain ${(value - principal).toFixed(4)}`);
+  const drift = Math.abs(value - state.deployed);
+  console.log(`Principal ${principal.toFixed(2)} → value ${value.toFixed(4)} (rate ${rate.toFixed(6)}) | on-chain deployed ${state.deployed.toFixed(4)} | drift ${drift.toFixed(4)} | gain ${(value - principal).toFixed(4)}`);
+
+  if (drift < MARK_DEADBAND) {
+    console.log(`No material change (< ${MARK_DEADBAND} dUSDC) — skipping mark (no tx).`);
+    return;
+  }
 
   const r = await execute(buildVaultMark(BigInt(Math.round(value * Number(DUSDC_SCALE)))));
   console.log(`✓ mark tx: ${r.digest}`);

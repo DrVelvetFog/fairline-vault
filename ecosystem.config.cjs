@@ -44,6 +44,19 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },
     {
+      name:          'fairline-mark',
+      script:        'npx',
+      args:          'tsx src/vault-strategy.ts mark',
+      cwd:           __dirname,
+      interpreter:   'none',
+      autorestart:   false,           // one-shot job (deadband-gated; usually no-op)
+      cron_restart:  '*/30 * * * *',  // re-mark vault NAV every 30 minutes
+      env:           {},
+      error_file:    'logs/mark-err.log',
+      out_file:      'logs/mark-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    },
+    {
       name:         'fairline-dashboard',
       script:       'npx',
       args:         'tsx src/dashboard.ts',
