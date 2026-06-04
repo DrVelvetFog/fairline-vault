@@ -2,6 +2,8 @@
 
 > Sui Overflow 2026 · DeepBook Track · testnet
 
+**🌐 [Live site](https://fairline-vault.netlify.app) · 🎬 [Demo video](https://youtu.be/dJPlnTcuF5g) · 🔎 [Verify on-chain](https://suiscan.xyz/testnet/object/0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e)**
+
 FairLine is an autonomous liquidity vault for [DeepBook Predict](https://docs.sui.io/onchain-finance/deepbook-predict/) on Sui. It earns the prediction market's structural **house edge** by providing liquidity (PLP), and uses a machine-learning directional model **defensively** — to gate that liquidity exposure against directional risk, not to gamble with it. Every decision and every transaction is on-chain and verifiable.
 
 ## The one-line pitch
