@@ -22,3 +22,5 @@ contracts/**/build/
 logs/accrual.jsonl
 logs/demo-wallet.json
 demo/
+logs/vault-strategy.json
+contracts/**/Published.toml
