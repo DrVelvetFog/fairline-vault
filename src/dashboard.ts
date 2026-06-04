@@ -271,7 +271,8 @@ main{display:grid;grid-template-columns:300px 1fr 320px;gap:16px;padding:16px 24
 
 /* Status dot */
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
-.dot-green{background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot-green{background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 6px var(--green)}50%{opacity:.45;box-shadow:0 0 12px var(--green)}}
 .dot-yellow{background:var(--amber)}
 .dot-red{background:var(--red);box-shadow:0 0 6px var(--red)}
 .dot-grey{background:var(--muted)}
@@ -754,7 +755,8 @@ async function loadAll(){
 }
 
 loadAll();
-setInterval(loadAll,60000);
+setInterval(loadAll, 10000);  // refresh on-chain + market data every 10s (visibly live)
+setInterval(function(){ var e=document.getElementById('hd-time'); if(e) e.textContent=new Date().toLocaleTimeString(); }, 1000);  // ticking clock
 </script>
 </body>
 </html>`;
