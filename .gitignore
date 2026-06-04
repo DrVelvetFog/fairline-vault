@@ -21,3 +21,4 @@ src/redeem-plp.ts
 contracts/**/build/
 logs/accrual.jsonl
 logs/demo-wallet.json
+demo/audio/
