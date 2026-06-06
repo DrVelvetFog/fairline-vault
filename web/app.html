@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FairLine Vault — Deposit & Withdraw</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surf:#111923;--surf2:#16202c;--border:#243140;--text:#eaf1f8;--muted:#8b9aa9;--faint:#566472;--green:#36e07f;--green2:#1fae5e;--blue:#5b9dff;--red:#ff5d52;--sans:'Inter',sans-serif;--mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:radial-gradient(900px 500px at 50% -10%,rgba(54,224,127,.12),transparent 60%),var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;-webkit-font-smoothing:antialiased}
+a{color:var(--green);text-decoration:none}
+.mono{font-family:var(--mono)}
+.wrap{max-width:760px;margin:0 auto;padding:24px}
+nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}.logo span{color:var(--green)}
+.logosvg{width:28px;height:28px}
+h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:26px 0 6px}
+.sub{color:var(--muted);font-size:15px;margin-bottom:24px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:11px;font-weight:600;font-size:14px;cursor:pointer;border:1px solid transparent;font-family:inherit;transition:transform .15s,background .2s}
+.btn-primary{background:linear-gradient(120deg,var(--green),var(--green2));color:#04190d}
+.btn-primary:hover{transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-ghost{background:var(--surf2);border-color:var(--border);color:var(--text)}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:16px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:14px}
+.row:last-child{border-bottom:none}.row .k{color:var(--muted)}.row .v{font-family:var(--mono);font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.stat{background:var(--surf);border:1px solid var(--border);border-radius:14px;padding:16px}
+.stat .v{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)}.stat .l{color:var(--muted);font-size:12px;margin-top:4px}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:8px}
+.inputrow{display:flex;gap:10px}
+input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:13px 15px;color:var(--text);font-family:var(--mono);font-size:16px;outline:none}
+input:focus{border-color:var(--green)}
+.maxbtn{background:var(--surf2);border:1px solid var(--border);border-radius:11px;padding:0 14px;color:var(--muted);cursor:pointer;font-size:12px;font-weight:600}
+h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(54,224,127,.14);color:var(--green)}
+.status{margin-top:14px;font-size:13px;padding:12px 14px;border-radius:10px;display:none}
+.status.show{display:block}
+.status.info{background:rgba(91,157,255,.1);color:var(--blue);border:1px solid rgba(91,157,255,.3)}
+.status.ok{background:rgba(54,224,127,.1);color:var(--green);border:1px solid rgba(54,224,127,.3)}
+.status.err{background:rgba(255,93,82,.1);color:var(--red);border:1px solid rgba(255,93,82,.3)}
+.note{font-size:12px;color:var(--faint);margin-top:18px;line-height:1.6;text-align:center}
+.hidden{display:none}
+.addr{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.walletlist{display:flex;flex-direction:column;gap:10px}
+.walletbtn{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--surf2);cursor:pointer;font-weight:600;font-size:14px}
+.walletbtn:hover{border-color:var(--green)}
+.walletbtn img{width:24px;height:24px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="logo" href="./"><svg class="logosvg" viewBox="0 0 120 120"><rect width="120" height="120" rx="28" fill="#10160e"/><path d="M52 60 L94 33" stroke="#36e07f" stroke-width="6.5" stroke-linecap="round"/><circle cx="94" cy="33" r="5.5" fill="#36e07f"/><circle cx="52" cy="60" r="7.5" fill="#ece2d0"/><circle cx="52" cy="60" r="3.2" fill="#10160e"/></svg>Fair<span>Line</span></a>
+    <button class="btn btn-ghost" id="connectBtn">Connect Wallet</button>
+  </nav>
+
+  <h1>Vault App <span class="tag">TESTNET</span></h1>
+  <p class="sub">Deposit dUSDC into the FairLine vault, receive FLP shares priced at NAV, and withdraw your pro-rata claim — all on-chain.</p>
+
+  <!-- live vault stats (always shown, read-only from chain) -->
+  <div class="grid">
+    <div class="stat"><div class="v" id="s-tvl">—</div><div class="l">Vault TVL (dUSDC)</div></div>
+    <div class="stat"><div class="v" id="s-price">—</div><div class="l">FLP share price (NAV)</div></div>
+  </div>
+
+  <!-- connect prompt -->
+  <div class="card" id="connectCard">
+    <h2>Connect a Sui wallet</h2>
+    <div class="walletlist" id="walletList"><p class="addr">Looking for Sui wallets… install Slush / Sui Wallet or Suiet, then reload.</p></div>
+  </div>
+
+  <!-- account + actions (after connect) -->
+  <div id="app" class="hidden">
+    <div class="card">
+      <div class="row"><span class="k">Connected</span><span class="addr" id="acct">—</span></div>
+      <div class="row"><span class="k">Your dUSDC</span><span class="v" id="bal-dusdc">—</span></div>
+      <div class="row"><span class="k">Your FLP shares</span><span class="v" id="bal-flp">—</span></div>
+      <div class="row"><span class="k">Your position value</span><span class="v" id="pos-val">—</span></div>
+    </div>
+
+    <div class="card">
+      <h2>💧 Deposit</h2>
+      <label>Amount of dUSDC to deposit</label>
+      <div class="inputrow"><input id="depAmt" type="number" min="0" step="0.000001" placeholder="0.00"><button class="maxbtn" id="depMax">MAX</button></div>
+      <button class="btn btn-primary" id="depBtn" style="margin-top:14px;width:100%;justify-content:center">Deposit → mint FLP shares</button>
+      <div class="status" id="depStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>🏦 Withdraw</h2>
+      <label>FLP shares to redeem</label>
+      <div class="inputrow"><input id="wAmt" type="number" min="0" step="0.000001" placeholder="0.00"><button class="maxbtn" id="wMax">MAX</button></div>
+      <button class="btn btn-primary" id="wBtn" style="margin-top:14px;width:100%;justify-content:center">Withdraw → burn FLP for dUSDC</button>
+      <div class="status" id="wStatus"></div>
+    </div>
+  </div>
+
+  <p class="note">FairLine Vault on Sui testnet · <a href="https://suiscan.xyz/testnet/object/0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e" target="_blank" rel="noopener">view contract ↗</a> · <a href="./">back to site</a><br>Need testnet dUSDC? Request it via the DeepBook Predict docs. Unaudited — testnet only.</p>
+</div>
+
+<script type="module">
+import { SuiClient } from 'https://esm.sh/@mysten/sui@1.18.0/client';
+import { Transaction } from 'https://esm.sh/@mysten/sui@1.18.0/transactions';
+import { getWallets } from 'https://esm.sh/@mysten/wallet-standard@0.13.0';
+
+const RPC='https://fullnode.testnet.sui.io:443';
+const PKG='0xfe5abfde639a8ea1a208808578f1c7f79f4aa94cf15a77f169cdc8f3d8c0ccfb';
+const VAULT='0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e';
+const PREDICT='0xc8736204d12f0a7277c86388a68bf8a194b0a14c5538ad13f22cbd8e2a38028a';
+const DUSDC='0xe95040085976bfd54a1a07225cd46c8a2b4e8e2b6732f140a0fc49850ba73e1a::dusdc::DUSDC';
+const FLP=PKG+'::vault::VAULT';
+const SCALE=1e6;
+const client=new SuiClient({url:RPC});
+let wallet=null, account=null, sharePrice=1;
+
+const $=id=>document.getElementById(id);
+const fmt=(n,d)=>Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+function status(el,kind,msg){el.className='status show '+kind;el.innerHTML=msg;}
+
+// ── live vault stats (no wallet needed) ──────────────────────────────────────
+async function loadVault(){
+  try{
+    const o=await client.getObject({id:VAULT,options:{showContent:true}});
+    const f=o.data.content.fields;
+    const reserve=Number(f.reserve)/SCALE, deployed=Number(f.deployed)/SCALE;
+    const shares=Number(f.treasury.fields.total_supply.fields.value)/SCALE;
+    const nav=reserve+deployed; sharePrice=shares>0?nav/shares:1;
+    $('s-tvl').textContent=fmt(nav,2);
+    $('s-price').textContent=fmt(sharePrice,6);
+  }catch(e){ $('s-tvl').textContent='—'; }
+}
+
+// ── balances (after connect) ─────────────────────────────────────────────────
+async function loadBalances(){
+  if(!account) return;
+  try{
+    const [d,p]=await Promise.all([
+      client.getBalance({owner:account.address,coinType:DUSDC}),
+      client.getBalance({owner:account.address,coinType:FLP}),
+    ]);
+    const dusdc=Number(d.totalBalance)/SCALE, flp=Number(p.totalBalance)/SCALE;
+    $('bal-dusdc').textContent=fmt(dusdc,4)+' dUSDC';
+    $('bal-flp').textContent=fmt(flp,4)+' FLP';
+    $('pos-val').textContent=fmt(flp*sharePrice,4)+' dUSDC';
+    $('depMax').dataset.max=dusdc; $('wMax').dataset.max=flp;
+  }catch(e){}
+}
+
+// ── wallet discovery + connect ───────────────────────────────────────────────
+const walletsApi=getWallets();
+function suiWallets(){return walletsApi.get().filter(w=>(w.chains||[]).some(c=>String(c).startsWith('sui:')));}
+function renderWallets(){
+  const list=suiWallets();
+  const el=$('walletList');
+  if(!list.length){el.innerHTML='<p class="addr">No Sui wallet detected. Install Slush (Sui Wallet) or Suiet, then reload.</p>';return;}
+  el.innerHTML='';
+  list.forEach(w=>{
+    const b=document.createElement('button');b.className='walletbtn';
+    b.innerHTML=(w.icon?`<img src="${w.icon}" alt="">`:'')+w.name;
+    b.onclick=()=>connect(w);
+    el.appendChild(b);
+  });
+}
+walletsApi.on('register',renderWallets);
+setTimeout(renderWallets,400); setTimeout(renderWallets,1500); renderWallets();
+
+async function connect(w){
+  try{
+    const res=await w.features['standard:connect'].connect();
+    wallet=w; account=(res&&res.accounts&&res.accounts[0])||w.accounts[0];
+    if(!account){alert('No account returned by wallet');return;}
+    $('acct').textContent=account.address.slice(0,8)+'…'+account.address.slice(-6);
+    $('connectBtn').textContent='Connected';
+    $('connectCard').classList.add('hidden'); $('app').classList.remove('hidden');
+    loadBalances();
+  }catch(e){alert('Connect failed: '+(e.message||e));}
+}
+$('connectBtn').onclick=()=>{const l=suiWallets();if(l.length)connect(l[0]);else alert('No Sui wallet found. Install Slush or Suiet and reload.');};
+
+// ── execute a transaction through the connected wallet ───────────────────────
+async function execTx(tx){
+  tx.setSender(account.address);
+  const f=wallet.features;
+  if(f['sui:signAndExecuteTransaction']){
+    return await f['sui:signAndExecuteTransaction'].signAndExecuteTransaction({transaction:tx,account,chain:'sui:testnet'});
+  }
+  if(f['sui:signAndExecuteTransactionBlock']){
+    return await f['sui:signAndExecuteTransactionBlock'].signAndExecuteTransactionBlock({transactionBlock:tx,account,chain:'sui:testnet'});
+  }
+  throw new Error('Wallet does not support signing transactions');
+}
+const scan=d=>`<a href="https://suiscan.xyz/testnet/tx/${d}" target="_blank" rel="noopener">${d.slice(0,10)}… ↗</a>`;
+
+// ── deposit ──────────────────────────────────────────────────────────────────
+$('depMax').onclick=()=>{$('depAmt').value=$('depMax').dataset.max||'';};
+$('depBtn').onclick=async()=>{
+  if(!account)return;
+  const amt=parseFloat($('depAmt').value);
+  if(!(amt>0))return status($('depStatus'),'err','Enter an amount.');
+  const raw=BigInt(Math.round(amt*SCALE));
+  status($('depStatus'),'info','Building transaction… approve it in your wallet.');
+  try{
+    const coins=(await client.getCoins({owner:account.address,coinType:DUSDC})).data;
+    if(!coins.length)return status($('depStatus'),'err','No dUSDC in wallet.');
+    const tx=new Transaction();
+    const primary=tx.object(coins[0].coinObjectId);
+    if(coins.length>1)tx.mergeCoins(primary,coins.slice(1).map(c=>tx.object(c.coinObjectId)));
+    const [coin]=tx.splitCoins(primary,[tx.pure.u64(raw)]);
+    const shares=tx.moveCall({target:`${PKG}::vault::deposit`,typeArguments:[DUSDC],arguments:[tx.object(VAULT),coin]});
+    tx.transferObjects([shares],account.address);
+    const r=await execTx(tx);
+    status($('depStatus'),'ok','✓ Deposited '+amt+' dUSDC → FLP shares. Tx '+scan(r.digest));
+    setTimeout(()=>{loadVault();loadBalances();},2500);
+  }catch(e){status($('depStatus'),'err','Failed: '+(e.message||e));}
+};
+
+// ── withdraw ─────────────────────────────────────────────────────────────────
+$('wMax').onclick=()=>{$('wAmt').value=$('wMax').dataset.max||'';};
+$('wBtn').onclick=async()=>{
+  if(!account)return;
+  const amt=parseFloat($('wAmt').value);
+  if(!(amt>0))return status($('wStatus'),'err','Enter FLP shares.');
+  const raw=BigInt(Math.round(amt*SCALE));
+  status($('wStatus'),'info','Building transaction… approve it in your wallet.');
+  try{
+    const coins=(await client.getCoins({owner:account.address,coinType:FLP})).data;
+    if(!coins.length)return status($('wStatus'),'err','No FLP shares in wallet.');
+    const tx=new Transaction();
+    const primary=tx.object(coins[0].coinObjectId);
+    if(coins.length>1)tx.mergeCoins(primary,coins.slice(1).map(c=>tx.object(c.coinObjectId)));
+    const [exact]=tx.splitCoins(primary,[tx.pure.u64(raw)]);
+    const out=tx.moveCall({target:`${PKG}::vault::withdraw`,typeArguments:[DUSDC],arguments:[tx.object(VAULT),exact]});
+    tx.transferObjects([out],account.address);
+    const r=await execTx(tx);
+    status($('wStatus'),'ok','✓ Withdrew '+amt+' FLP → dUSDC. Tx '+scan(r.digest));
+    setTimeout(()=>{loadVault();loadBalances();},2500);
+  }catch(e){status($('wStatus'),'err','Failed: '+(e.message||e));}
+};
+
+loadVault(); setInterval(loadVault,15000);
+</script>
+</body>
+</html>
