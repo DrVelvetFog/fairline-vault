@@ -15,6 +15,9 @@ a{color:var(--green);text-decoration:none}
 nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}.logo span{color:var(--green)}
 .logosvg{width:28px;height:28px}
+.navlinks{display:flex;gap:22px;align-items:center}
+.navlinks a{color:var(--muted);font-size:14px;font-weight:500}.navlinks a:hover{color:var(--text)}
+@media(max-width:680px){.navlinks .hidesm{display:none}}
 h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:26px 0 6px}
 .sub{color:var(--muted);font-size:15px;margin-bottom:24px}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:11px;font-weight:600;font-size:14px;cursor:pointer;border:1px solid transparent;font-family:inherit;transition:transform .15s,background .2s}
@@ -52,8 +55,13 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
 <body>
 <div class="wrap">
   <nav>
-    <a class="logo" href="./"><svg class="logosvg" viewBox="0 0 120 120"><rect width="120" height="120" rx="28" fill="#10160e"/><path d="M52 60 L94 33" stroke="#36e07f" stroke-width="6.5" stroke-linecap="round"/><circle cx="94" cy="33" r="5.5" fill="#36e07f"/><circle cx="52" cy="60" r="7.5" fill="#ece2d0"/><circle cx="52" cy="60" r="3.2" fill="#10160e"/></svg>Fair<span>Line</span></a>
-    <button class="btn btn-ghost" id="connectBtn">Connect Wallet</button>
+    <a class="logo" href="/"><svg class="logosvg" viewBox="0 0 120 120"><rect width="120" height="120" rx="28" fill="#10160e"/><path d="M52 60 L94 33" stroke="#36e07f" stroke-width="6.5" stroke-linecap="round"/><circle cx="94" cy="33" r="5.5" fill="#36e07f"/><circle cx="52" cy="60" r="7.5" fill="#ece2d0"/><circle cx="52" cy="60" r="3.2" fill="#10160e"/></svg>Fair<span>Line</span></a>
+    <div class="navlinks">
+      <a class="hidesm" href="/#how">How it works</a>
+      <a class="hidesm" href="/#verify">Verify</a>
+      <a class="hidesm" href="/">← Site</a>
+      <button class="btn btn-ghost" id="connectBtn">Connect Wallet</button>
+    </div>
   </nav>
 
   <h1>Vault App <span class="tag">TESTNET</span></h1>
@@ -97,7 +105,7 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
     </div>
   </div>
 
-  <p class="note">FairLine Vault on Sui testnet · <a href="https://suiscan.xyz/testnet/object/0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e" target="_blank" rel="noopener">view contract ↗</a> · <a href="./">back to site</a><br>Need testnet dUSDC? Request it via the DeepBook Predict docs. Unaudited — testnet only.</p>
+  <p class="note">FairLine Vault on Sui testnet · <a href="https://suiscan.xyz/testnet/object/0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e" target="_blank" rel="noopener">view contract ↗</a> · <a href="/">back to site</a><br>Need testnet dUSDC? Request it via the DeepBook Predict docs. Unaudited — testnet only.</p>
 </div>
 
 <script type="module">
