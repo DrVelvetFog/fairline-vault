@@ -45,6 +45,14 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
 .status.err{background:rgba(255,93,82,.1);color:var(--red);border:1px solid rgba(255,93,82,.3)}
 .note{font-size:12px;color:var(--faint);margin-top:18px;line-height:1.6;text-align:center}
 .hidden{display:none}
+.abar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--bg);border:1px solid var(--border)}
+.abar>span{height:100%;transition:width .6s}
+.leg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:middle}
+.leg{display:flex;gap:16px;font-size:11px;color:var(--muted);margin-top:6px}
+.pnl-big{font-family:var(--mono);font-size:26px;font-weight:700;margin:2px 0 2px}
+.tag.calm{background:rgba(54,224,127,.14);color:var(--green)}
+.tag.elevated{background:rgba(224,169,60,.16);color:var(--amber)}
+.tag.extreme{background:rgba(255,93,82,.16);color:var(--red)}
 .addr{font-family:var(--mono);font-size:12px;color:var(--muted)}
 .walletlist{display:flex;flex-direction:column;gap:10px}
 .walletbtn{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--surf2);cursor:pointer;font-weight:600;font-size:14px}
@@ -73,6 +81,21 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
     <div class="stat"><div class="v" id="s-price">—</div><div class="l">FLP share price (NAV)</div></div>
   </div>
 
+  <!-- vault & market conditions (read-only, no wallet needed) -->
+  <div class="card">
+    <h2>📊 Vault &amp; Market <span class="tag calm" id="regime-tag">—</span></h2>
+    <div class="row"><span class="k">House edge to date</span><span class="v" id="vm-edge" style="color:var(--green)">—</span></div>
+    <div class="row"><span class="k">BTC spot</span><span class="v" id="vm-spot">—</span></div>
+    <div class="row"><span class="k">Realized vol (annualized)</span><span class="v" id="vm-vol">—</span></div>
+    <div class="row"><span class="k">Move (since window open)</span><span class="v" id="vm-trend">—</span></div>
+    <div class="row"><span class="k">LP posture · ML/vol gate</span><span class="v" id="vm-posture">—</span></div>
+    <div style="margin-top:14px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Vault capital allocation</div>
+      <div class="abar"><span id="ab-deployed" style="width:0%;background:var(--green)"></span><span id="ab-reserve" style="width:0%;background:var(--blue)"></span></div>
+      <div class="leg"><span><i style="background:var(--green)"></i>Deployed (house) <span id="ab-d" class="mono">—</span></span><span><i style="background:var(--blue)"></i>Idle reserve <span id="ab-r" class="mono">—</span></span></div>
+    </div>
+  </div>
+
   <!-- connect prompt -->
   <div class="card" id="connectCard">
     <h2>Connect a Sui wallet</h2>
@@ -82,10 +105,14 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
   <!-- account + actions (after connect) -->
   <div id="app" class="hidden">
     <div class="card">
-      <div class="row"><span class="k">Connected</span><span class="addr" id="acct">—</span></div>
-      <div class="row"><span class="k">Your dUSDC</span><span class="v" id="bal-dusdc">—</span></div>
-      <div class="row"><span class="k">Your FLP shares</span><span class="v" id="bal-flp">—</span></div>
-      <div class="row"><span class="k">Your position value</span><span class="v" id="pos-val">—</span></div>
+      <h2>📈 Your Position <span class="addr" id="acct" style="margin-left:auto">—</span></h2>
+      <div style="font-size:12px;color:var(--muted)">Accrued P&amp;L</div>
+      <div class="pnl-big" id="pos-pnl">—</div>
+      <div class="row"><span class="k">FLP shares held</span><span class="v" id="bal-flp">—</span></div>
+      <div class="row"><span class="k">Position value (at NAV)</span><span class="v" id="pos-val">—</span></div>
+      <div class="row"><span class="k">Net deposited</span><span class="v" id="pos-net">—</span></div>
+      <div class="row"><span class="k">Avg entry → now (share price)</span><span class="v" id="pos-entry">—</span></div>
+      <div class="row"><span class="k">Wallet dUSDC</span><span class="v" id="bal-dusdc">—</span></div>
     </div>
 
     <div class="card">
@@ -127,17 +154,86 @@ const $=id=>document.getElementById(id);
 const fmt=(n,d)=>Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 function status(el,kind,msg){el.className='status show '+kind;el.innerHTML=msg;}
 
-// ── live vault stats (no wallet needed) ──────────────────────────────────────
-async function loadVault(){
+const PS='https://predict-server.testnet.mystenlabs.com';
+let reserve=0, deployed=0, flpBalance=0;
+
+// ── vault stats + house edge + allocation (no wallet needed) ─────────────────
+async function loadStats(){
   try{
-    const o=await client.getObject({id:VAULT,options:{showContent:true}});
-    const f=o.data.content.fields;
-    const reserve=Number(f.reserve)/SCALE, deployed=Number(f.deployed)/SCALE;
+    const [v,p]=await Promise.all([
+      client.getObject({id:VAULT,options:{showContent:true}}),
+      client.getObject({id:PREDICT,options:{showContent:true}}),
+    ]);
+    const f=v.data.content.fields;
+    reserve=Number(f.reserve)/SCALE; deployed=Number(f.deployed)/SCALE;
     const shares=Number(f.treasury.fields.total_supply.fields.value)/SCALE;
     const nav=reserve+deployed; sharePrice=shares>0?nav/shares:1;
     $('s-tvl').textContent=fmt(nav,2);
     $('s-price').textContent=fmt(sharePrice,6);
-  }catch(e){ $('s-tvl').textContent='—'; }
+    const pf=p.data.content.fields;
+    const rate=Number(pf.vault.fields.balance)/Number(pf.treasury_cap.fields.total_supply.fields.value);
+    const edge=(rate-1)*100;
+    $('vm-edge').textContent=(edge>=0?'+':'')+fmt(edge,4)+'%';
+    const tot=nav||1;
+    $('ab-deployed').style.width=(deployed/tot*100)+'%';
+    $('ab-reserve').style.width=(reserve/tot*100)+'%';
+    $('ab-d').textContent=fmt(deployed,2); $('ab-r').textContent=fmt(reserve,2);
+  }catch(e){}
+}
+
+// ── market conditions (BTC spot / realized vol / regime) ─────────────────────
+async function loadMarket(){
+  try{
+    const oracles=await fetch(PS+'/oracles?status=active').then(r=>r.json());
+    if(!oracles||!oracles.length)return;
+    const now=Date.now();
+    const o=oracles.filter(x=>x.expiry>now).sort((a,b)=>a.expiry-b.expiry)[0]||oracles[0];
+    const [latest,hist]=await Promise.all([
+      fetch(PS+'/oracles/'+o.oracle_id+'/prices/latest').then(r=>r.json()),
+      fetch(PS+'/oracles/'+o.oracle_id+'/prices').then(r=>r.json()),
+    ]);
+    const spot=Number(latest.spot)/1e9;
+    const win=(hist||[]).slice(-20).sort((a,b)=>a.checkpoint_timestamp_ms-b.checkpoint_timestamp_ms);
+    let vol=0;
+    if(win.length>=2){
+      const lr=[]; let totalMs=0;
+      for(let i=1;i<win.length;i++){const pr=Number(win[i-1].spot)/1e9,cu=Number(win[i].spot)/1e9,dt=win[i].checkpoint_timestamp_ms-win[i-1].checkpoint_timestamp_ms;if(pr>0&&cu>0&&dt>0){lr.push(Math.log(cu/pr));totalMs+=dt;}}
+      if(lr.length&&totalMs>0){const m=lr.reduce((a,b)=>a+b,0)/lr.length;const va=lr.reduce((a,r)=>a+(r-m)**2,0)/lr.length;const apy=(totalMs/lr.length)/(365*24*3600*1000);vol=apy>0?Math.sqrt(va)/Math.sqrt(apy)*100:0;}
+    }
+    const first=win.length?Number(win[0].spot)/1e9:spot;
+    const chg=first>0?(spot-first)/first*100:0;
+    const regime=vol>=30?'extreme':vol>=15?'elevated':'calm';
+    const posture=regime==='extreme'?'Pull back — stop adding':regime==='elevated'?'Reduced exposure':'Full exposure';
+    $('vm-spot').textContent='$'+fmt(spot,0);
+    $('vm-vol').textContent=fmt(vol,1)+'%';
+    $('vm-trend').textContent=(chg>=0?'+':'')+fmt(chg,3)+'%';
+    $('vm-trend').style.color=chg>=0?'var(--green)':'var(--red)';
+    $('vm-posture').textContent=posture;
+    const tag=$('regime-tag'); tag.textContent=regime.toUpperCase(); tag.className='tag '+regime;
+  }catch(e){}
+}
+
+// ── accrued P&L from this wallet's on-chain deposit/withdraw events ───────────
+async function queryEvents(type){
+  const r=await fetch(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"suix_queryEvents",params:[{MoveEventType:type},null,50,true]})}).then(x=>x.json());
+  return (r.result&&r.result.data)||[];
+}
+async function loadPnl(){
+  if(!account)return;
+  try{
+    const addr=account.address;
+    const [dep,wd]=await Promise.all([queryEvents(PKG+'::vault::Deposited'),queryEvents(PKG+'::vault::Withdrawn')]);
+    let depUsd=0,depShares=0,wdUsd=0;
+    dep.forEach(e=>{const j=e.parsedJson;if(j&&j.depositor===addr){depUsd+=Number(j.amount)/SCALE;depShares+=Number(j.shares)/SCALE;}});
+    wd.forEach(e=>{const j=e.parsedJson;if(j&&j.withdrawer===addr){wdUsd+=Number(j.amount)/SCALE;}});
+    const value=flpBalance*sharePrice;
+    const pnl=(value+wdUsd)-depUsd, pct=depUsd>0?pnl/depUsd*100:0, entry=depShares>0?depUsd/depShares:1;
+    const el=$('pos-pnl');
+    el.textContent=(pnl>=0?'+':'')+fmt(pnl,4)+' dUSDC  ('+(pnl>=0?'+':'')+fmt(pct,2)+'%)';
+    el.style.color=pnl>=0?'var(--green)':'var(--red)';
+    $('pos-net').textContent=fmt(depUsd-wdUsd,4)+' dUSDC';
+    $('pos-entry').textContent=fmt(entry,6)+' → '+fmt(sharePrice,6);
+  }catch(e){}
 }
 
 // ── balances (after connect) ─────────────────────────────────────────────────
@@ -148,11 +244,12 @@ async function loadBalances(){
       client.getBalance({owner:account.address,coinType:DUSDC}),
       client.getBalance({owner:account.address,coinType:FLP}),
     ]);
-    const dusdc=Number(d.totalBalance)/SCALE, flp=Number(p.totalBalance)/SCALE;
+    const dusdc=Number(d.totalBalance)/SCALE; flpBalance=Number(p.totalBalance)/SCALE;
     $('bal-dusdc').textContent=fmt(dusdc,4)+' dUSDC';
-    $('bal-flp').textContent=fmt(flp,4)+' FLP';
-    $('pos-val').textContent=fmt(flp*sharePrice,4)+' dUSDC';
-    $('depMax').dataset.max=dusdc; $('wMax').dataset.max=flp;
+    $('bal-flp').textContent=fmt(flpBalance,4)+' FLP';
+    $('pos-val').textContent=fmt(flpBalance*sharePrice,4)+' dUSDC';
+    $('depMax').dataset.max=dusdc; $('wMax').dataset.max=flpBalance;
+    loadPnl();
   }catch(e){}
 }
 
@@ -227,7 +324,7 @@ $('depBtn').onclick=async()=>{
     tx.transferObjects([shares],account.address);
     const r=await execTx(tx);
     status($('depStatus'),'ok','✓ Deposited '+amt+' dUSDC → FLP shares. Tx '+scan(r.digest));
-    setTimeout(()=>{loadVault();loadBalances();},2500);
+    setTimeout(()=>{loadStats();loadBalances();},2500);
   }catch(e){status($('depStatus'),'err','Failed: '+(e.message||e));}
 };
 
@@ -250,11 +347,12 @@ $('wBtn').onclick=async()=>{
     tx.transferObjects([out],account.address);
     const r=await execTx(tx);
     status($('wStatus'),'ok','✓ Withdrew '+amt+' FLP → dUSDC. Tx '+scan(r.digest));
-    setTimeout(()=>{loadVault();loadBalances();},2500);
+    setTimeout(()=>{loadStats();loadBalances();},2500);
   }catch(e){status($('wStatus'),'err','Failed: '+(e.message||e));}
 };
 
-loadVault(); setInterval(loadVault,15000);
+function refreshAll(){ loadStats(); loadMarket(); if(account) loadBalances(); }
+refreshAll(); setInterval(refreshAll,15000);
 </script>
 </body>
 </html>
