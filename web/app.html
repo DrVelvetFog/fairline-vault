@@ -152,10 +152,11 @@ async function loadBalances(){
 const walletsApi=getWallets();
 function suiWallets(){return walletsApi.get().filter(w=>(w.chains||[]).some(c=>String(c).startsWith('sui:')));}
 function renderWallets(){
-  const list=suiWallets();
+  // Sort Slush / Sui Wallet to the top; you pick the wallet explicitly.
+  const list=suiWallets().sort((a,b)=>(/slush|sui wallet/i.test(b.name)?1:0)-(/slush|sui wallet/i.test(a.name)?1:0));
   const el=$('walletList');
   if(!list.length){el.innerHTML='<p class="addr">No Sui wallet detected. Install Slush (Sui Wallet) or Suiet, then reload.</p>';return;}
-  el.innerHTML='';
+  el.innerHTML='<p class="addr" style="margin-bottom:4px">Choose your wallet:</p>';
   list.forEach(w=>{
     const b=document.createElement('button');b.className='walletbtn';
     b.innerHTML=(w.icon?`<img src="${w.icon}" alt="">`:'')+w.name;
@@ -177,7 +178,13 @@ async function connect(w){
     loadBalances();
   }catch(e){alert('Connect failed: '+(e.message||e));}
 }
-$('connectBtn').onclick=()=>{const l=suiWallets();if(l.length)connect(l[0]);else alert('No Sui wallet found. Install Slush or Suiet and reload.');};
+// Don't auto-pick a wallet (Phantom also registers for Sui) — reveal the chooser so you select Slush.
+$('connectBtn').onclick=()=>{
+  if(!suiWallets().length){alert('No Sui wallet found. Install Slush (Sui Wallet) and reload.');return;}
+  renderWallets();
+  $('connectCard').classList.remove('hidden');
+  $('connectCard').scrollIntoView({behavior:'smooth'});
+};
 
 // ── execute a transaction through the connected wallet ───────────────────────
 async function execTx(tx){
