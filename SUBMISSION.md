@@ -60,11 +60,16 @@ model becomes a useful risk model.
   calm regimes with high model confidence. Its full P&L is reported honestly.
 - **Multi-user share vault (our own Move contract, live on testnet).** Anyone
   deposits dUSDC and receives fungible FLP shares priced at NAV; withdraws
-  pro-rata. The operator runs the LP strategy on the pooled capital. This turns
-  FairLine from a single bot into a **product with depositors and real TVL** —
-  deposit → deploy to PLP → earn the house edge → share price rises. Verified
-  end to end on-chain (deposit `GGFyppXc…`, deploy-to-PLP `7J1oNLrk…`, NAV mark
-  `FvtUkRNJ…`).
+  pro-rata — through a real wallet-connect dApp, not a script. The operator runs
+  the LP strategy on the pooled capital. This turns FairLine from a single bot
+  into a **product with depositors and real TVL** — deposit → deploy to PLP →
+  earn the house edge → share price rises. Verified end to end on-chain (deposit
+  `GGFyppXc…`, deploy-to-PLP `7J1oNLrk…`, NAV mark `FvtUkRNJ…`).
+  - **Who it's for:** anyone who wants prediction-market yield without running a
+    bot, holding keys, or sizing risk.
+  - **Verifiable NAV:** the FLP share price is the vault's NAV derived from the
+    on-chain PLP redemption rate — verifiable by anyone, not operator-set.
+    (Fully-trustless on-chain NAV inside Move is on the roadmap.)
 
 ## Verifiable on-chain facts (testnet, at time of writing)
 
