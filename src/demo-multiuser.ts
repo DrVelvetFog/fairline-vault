@@ -16,8 +16,8 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { Transaction } from '@mysten/sui/transactions';
 import { client, getAddress, execute } from './wallet.js';
 import { getDusdcCoins } from './coins.js';
-import { buildVaultDeposit, buildVaultWithdraw, getVaultState } from './vault.js';
-import { DUSDC_TYPE, FLP_TYPE, humanToDusdc } from './config.js';
+import { buildDepositJunior, buildWithdrawJunior, getVaultState } from './vault.js';
+import { DUSDC_TYPE, FLP_J_TYPE, humanToDusdc } from './config.js';
 
 const WALLET_FILE = 'logs/demo-wallet.json';
 const DEPOSIT = 50;     // dUSDC Bob deposits
@@ -58,7 +58,7 @@ async function main() {
   console.log(`Second depositor (Bob): ${bobAddr}\n`);
   console.log('Vault before:', JSON.stringify(await getVaultState()));
 
-  const heldFlp = Number((await client.getBalance({ owner: bobAddr, coinType: FLP_TYPE })).totalBalance) / 1e6;
+  const heldFlp = Number((await client.getBalance({ owner: bobAddr, coinType: FLP_J_TYPE })).totalBalance) / 1e6;
 
   if (heldFlp < DEPOSIT) {
     // 1. Fund Bob with dUSDC + SUI (one PTB, operator-signed).
@@ -71,9 +71,9 @@ async function main() {
 
     // 2. Bob deposits → FLP.
     const bobCoins = await bobDusdc(bobAddr);
-    const depTx = buildVaultDeposit(bobCoins, humanToDusdc(DEPOSIT), bobAddr);
+    const depTx = buildDepositJunior(bobCoins, humanToDusdc(DEPOSIT), bobAddr);
     console.log(`[2] Bob deposits ${DEPOSIT} dUSDC → FLP… tx ${await signExec(depTx, bob)}`);
-    const flp = await client.getBalance({ owner: bobAddr, coinType: FLP_TYPE });
+    const flp = await client.getBalance({ owner: bobAddr, coinType: FLP_J_TYPE });
     console.log(`    Bob now holds ${(Number(flp.totalBalance) / 1e6).toFixed(2)} FLP`);
     console.log('    Vault:', JSON.stringify(await getVaultState()));
   } else {
@@ -81,11 +81,11 @@ async function main() {
   }
 
   // 3. Bob withdraws part of his shares → dUSDC (lifecycle proof).
-  const flpCoins = (await client.getCoins({ owner: bobAddr, coinType: FLP_TYPE })).data;
-  const wTx = buildVaultWithdraw(flpCoins, humanToDusdc(WITHDRAW_FLP), bobAddr);
+  const flpCoins = (await client.getCoins({ owner: bobAddr, coinType: FLP_J_TYPE })).data;
+  const wTx = buildWithdrawJunior(flpCoins, humanToDusdc(WITHDRAW_FLP), bobAddr);
   console.log(`\n[3] Bob withdraws ${WITHDRAW_FLP} FLP → dUSDC… tx ${await signExec(wTx, bob)}`);
   const bobD = await getDusdcCoins(bobAddr);
-  const flp2 = await client.getBalance({ owner: bobAddr, coinType: FLP_TYPE });
+  const flp2 = await client.getBalance({ owner: bobAddr, coinType: FLP_J_TYPE });
   console.log(`    Bob now: ${(Number(bobD.totalRaw) / 1e6).toFixed(2)} dUSDC + ${(Number(flp2.totalBalance) / 1e6).toFixed(2)} FLP`);
   console.log('    Vault after:', JSON.stringify(await getVaultState()));
   console.log('\n━━━ done — vault now has 2 depositors (Alice + Bob) ━━━\n');

@@ -19,6 +19,8 @@ import { getVaultState } from './vault.js';
 import { getAddress, client } from './wallet.js';
 import { MANAGER_ID, DUSDC_SCALE, priceToHuman, PREDICT_OBJECT } from './config.js';
 import { computeFeatures } from './features.js';
+import { getLivePosture, Posture } from './posture.js';
+import { getFairness, ensureFreshMark } from './fairness.js';
 
 const PORT         = parseInt(process.env.DASHBOARD_PORT ?? '3002', 10);
 const CYCLES_LOG   = path.join(ROOT, 'logs/cycles.jsonl');
@@ -154,6 +156,33 @@ app.get('/api/vault-state', async (_req: Request, res: Response) => {
   catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
+// Vault posture (Green/Amber/Red) — depositor-facing risk state. Cached 15s
+// since it fetches live market data (oracle + price history).
+let postureCache: { data: Posture; ts: number } | null = null;
+app.get('/api/posture', async (_req: Request, res: Response) => {
+  try {
+    if (postureCache && Date.now() - postureCache.ts < 15_000) { res.json(postureCache.data); return; }
+    const p = await getLivePosture();
+    postureCache = { data: p, ts: Date.now() };
+    res.json(p);
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// Provably-fair pricing — fair (live) vs on-chain share price + drift.
+app.get('/api/fairness', async (_req: Request, res: Response) => {
+  try { res.json(await getFairness()); }
+  catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// Operator action: mark the vault to live value so the next entry/exit prices
+// at freshly-marked, honest NAV. Returns whether a mark was sent.
+app.post('/api/fair-mark', async (_req: Request, res: Response) => {
+  try {
+    const r = await ensureFreshMark();
+    res.json({ marked: r.marked, digest: r.digest ?? null, fairness: r.fairness });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
 app.get('/api/accrual', (_req: Request, res: Response) => {
   try {
     const lines = fs.readFileSync(path.join(ROOT, 'logs/accrual.jsonl'), 'utf-8').trim().split('\n').filter(Boolean);
@@ -235,6 +264,35 @@ header{background:rgba(13,18,25,.85);backdrop-filter:blur(10px);border-bottom:1p
 #hd-spot{font-size:19px;font-weight:700;color:var(--text);font-family:var(--mono)}
 #hd-expiry{font-size:11px;color:var(--muted)}
 .header-right{display:flex;align-items:center;gap:14px;font-size:11px;color:var(--muted)}
+
+/* Posture banner — depositor-facing risk state */
+.posture{display:flex;align-items:center;gap:16px;margin:18px 24px 0;padding:14px 18px;border-radius:12px;border:1px solid var(--border);background:var(--surf);position:relative;overflow:hidden}
+.posture::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--pc,var(--muted))}
+.posture .pdot{width:12px;height:12px;border-radius:50%;background:var(--pc,var(--muted));box-shadow:0 0 0 4px color-mix(in srgb,var(--pc,var(--muted)) 22%,transparent);flex:0 0 auto}
+.posture .ptext{flex:1;min-width:0}
+.posture .ptitle{font-size:13px;font-weight:700;letter-spacing:.01em;color:var(--text)}
+.posture .ptitle b{color:var(--pc,var(--text));text-transform:uppercase;letter-spacing:.06em}
+.posture .pdesc{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+.posture .pmeta{display:flex;gap:22px;flex:0 0 auto;text-align:right}
+.posture .pmeta .pm{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.posture .pmeta .pv{font-size:17px;font-weight:700;font-family:var(--mono);color:var(--text)}
+
+/* Tranche table */
+.trtable{margin:12px 0 6px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.trh,.trrow{display:grid;grid-template-columns:1.5fr 1fr 1fr .9fr;gap:6px;align-items:center;padding:8px 10px;font-size:11px}
+.trh{color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:9.5px;background:var(--surf2)}
+.trrow{border-top:1px solid var(--border);font-family:var(--mono)}
+.trrow b{font-family:var(--sans);font-size:12px}
+.trrow i{font-style:normal;color:var(--faint);font-size:9.5px}
+.trrow.tr-s{background:linear-gradient(90deg,rgba(63,215,122,.06),transparent)}
+.trrow.tr-j{background:linear-gradient(90deg,rgba(224,169,60,.07),transparent)}
+.tr-s b{color:var(--green)} .tr-j b{color:var(--amber)}
+
+/* Capacity meter */
+.caphead{display:flex;justify-content:space-between;align-items:baseline;margin:12px 0 5px}
+.caphead .k{color:var(--muted);font-size:11px} .caphead .v{font-family:var(--mono);font-size:11px}
+.capbar{height:8px;border-radius:5px;background:var(--surf2);overflow:hidden;border:1px solid var(--border)}
+.capfill{height:100%;width:0%;transition:width .5s,background .5s}
 
 /* Metrics bar */
 .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;padding:20px 24px 6px}
@@ -352,6 +410,19 @@ button:disabled{opacity:.5;cursor:not-allowed}
   </div>
 </header>
 
+<div class="posture" id="posture" style="--pc:var(--muted)">
+  <span class="pdot"></span>
+  <div class="ptext">
+    <div class="ptitle"><b id="p-state">—</b> · <span id="p-label">reading vault posture…</span></div>
+    <div class="pdesc" id="p-desc">FairLine gates house exposure on volatility — this is the live risk state.</div>
+  </div>
+  <div class="pmeta">
+    <div><div class="pv" id="p-vol">—</div><div class="pm">realized vol</div></div>
+    <div><div class="pv" id="p-exp">—</div><div class="pm">target exposure</div></div>
+    <div><div class="pv" id="p-sleeve">—</div><div class="pm">sleeve</div></div>
+  </div>
+</div>
+
 <div class="metrics">
   <div class="metric hero"><div class="lbl">PLP Position</div><div class="val" id="m-plp" style="color:var(--green)">—</div><div class="sub" id="m-plp-sub">liquidity supplied · the house</div></div>
   <div class="metric"><div class="lbl">House Edge</div><div class="val" id="m-edge" style="color:var(--green)">—</div><div class="sub">PLP redemption rate</div></div>
@@ -443,16 +514,34 @@ button:disabled{opacity:.5;cursor:not-allowed}
   <!-- Right: vault + ML risk gate + directional sleeve -->
   <div>
     <div class="card glow">
-      <h2>🏦 FairLine Vault <span class="tag tag-primary">MULTI-USER</span></h2>
+      <h2>🏦 FairLine Vault <span class="tag tag-primary">TRANCHED</span></h2>
       <div class="bigstat"><span class="num" id="v-tvl" style="font-size:28px">—</span><span class="unit">TVL (dUSDC)</span></div>
-      <div class="row"><span class="k">Share price (FLP)</span><span class="v" id="v-price">—</span></div>
-      <div class="row"><span class="k">FLP supply</span><span class="v" id="v-supply">—</span></div>
+      <div class="caphead"><span class="k">Capacity (honest edge — closes when full)</span><span class="v" id="v-cap">—</span></div>
+      <div class="capbar"><div class="capfill" id="v-capfill"></div></div>
+      <div class="trtable">
+        <div class="trh"><span>Tranche</span><span>Value</span><span>Shares</span><span>Price</span></div>
+        <div class="trrow tr-s"><span><b>Senior</b> <i>protected · ≤8%</i></span><span id="v-s-val">—</span><span id="v-s-sup">—</span><span id="v-s-px">—</span></div>
+        <div class="trrow tr-j"><span><b>Junior</b> <i>first-loss · lev.</i></span><span id="v-j-val">—</span><span id="v-j-sup">—</span><span id="v-j-px">—</span></div>
+      </div>
       <div class="row"><span class="k">Idle reserve</span><span class="v" id="v-reserve">—</span></div>
       <div class="row"><span class="k">Deployed to strategy</span><span class="v" id="v-deployed">—</span></div>
+      <div class="row"><span class="k">Senior coverage</span><span class="v" id="v-cov">—</span></div>
+      <div class="row"><span class="k">Last marked</span><span class="v" id="v-marked">—</span></div>
       <div class="note">
-        On-chain share vault — anyone deposits dUSDC for FLP shares priced at NAV, withdraws pro-rata.
+        Tranched on-chain vault — deposit into the senior (protected) or junior (first-loss, leveraged) tranche. Junior absorbs losses first; senior earns up to its target, junior takes the upside tail.
         <span class="mono" id="v-addr">—</span>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>⚖️ Provably-Fair Pricing <span class="tag" id="fair-badge" style="background:rgba(125,136,150,.14);color:var(--muted)">—</span></h2>
+      <div class="note" style="border:none;padding:0 0 10px;margin:0">You always transact at <strong style="color:var(--text)">freshly-marked NAV</strong>. The fair price is recomputed independently from the on-chain PLP rate — drift is the gap between what the contract would charge now and the honest price.</div>
+      <div class="row"><span class="k">Fair share price</span><span class="v" id="fair-sp" style="color:var(--green)">—</span></div>
+      <div class="row"><span class="k">On-chain share price</span><span class="v" id="fair-onchain">—</span></div>
+      <div class="row"><span class="k">Drift (entry/exit unfairness)</span><span class="v" id="fair-drift">—</span></div>
+      <div class="row"><span class="k">Live NAV vs recorded</span><span class="v" id="fair-nav">—</span></div>
+      <button class="btn-secondary" id="fair-btn" style="margin-top:12px;width:100%" onclick="fairMark()">⚖️ Mark to fair NAV</button>
+      <div class="note mono" id="fair-msg" style="display:none"></div>
     </div>
 
     <div class="card">
@@ -473,7 +562,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 function fmt(ts){if(!ts)return'—';const d=new Date(ts);return d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});}
 function fmtDate(ts){if(!ts)return'—';return new Date(ts).toISOString().slice(0,16).replace('T',' ');}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-async function api(url){const r=await fetch(url);if(!r.ok)throw new Error(r.statusText);return r.json();}
+async function api(url,opts){const r=await fetch(url,opts);if(!r.ok)throw new Error(r.statusText);return r.json();}
 
 // ── Market ───────────────────────────────────────────────────────────────────
 
@@ -716,12 +805,26 @@ async function loadVaultState(){
   try{
     const d=await api('/api/vault-state');
     document.getElementById('v-tvl').textContent=d.nav.toFixed(2);
-    document.getElementById('v-price').textContent=d.sharePrice.toFixed(6)+' dUSDC';
-    document.getElementById('v-price').style.color=d.sharePrice>=1?'var(--green)':'var(--red)';
-    document.getElementById('v-supply').textContent=d.totalShares.toFixed(2)+' FLP';
+    document.getElementById('v-s-val').textContent=d.seniorValue.toFixed(2);
+    document.getElementById('v-s-sup').textContent=d.seniorShares.toFixed(2);
+    document.getElementById('v-s-px').textContent=d.seniorPrice.toFixed(4);
+    document.getElementById('v-j-val').textContent=d.juniorValue.toFixed(2);
+    document.getElementById('v-j-sup').textContent=d.juniorShares.toFixed(2);
+    document.getElementById('v-j-px').textContent=d.juniorPrice.toFixed(4);
+    const full=d.pctFull;
+    document.getElementById('v-cap').textContent=d.nav.toFixed(0)+' / '+d.capacity+' ('+full.toFixed(1)+'% · room '+d.roomRemaining.toFixed(0)+')';
+    const fill=document.getElementById('v-capfill');
+    fill.style.width=Math.min(100,full)+'%';
+    fill.style.background=full>=100?'var(--red)':full>85?'var(--amber)':'var(--green)';
+    const cov=d.coverage;
+    const covEl=document.getElementById('v-cov');
+    if(cov==null||!isFinite(cov)){covEl.textContent='no junior buffer';covEl.style.color='var(--red)';}
+    else{covEl.textContent=cov.toFixed(2)+'× senior:junior';covEl.style.color=cov>3?'var(--amber)':'var(--muted)';}
     document.getElementById('v-reserve').textContent=d.reserve.toFixed(2)+' dUSDC';
     document.getElementById('v-deployed').textContent=d.deployed.toFixed(2)+' dUSDC';
-    document.getElementById('v-addr').textContent='0x71a352…af04fb7e';
+    const a=d.markAgeSec;
+    document.getElementById('v-marked').textContent=a<90?Math.round(a)+'s ago':a<5400?Math.round(a/60)+'m ago':Math.round(a/3600)+'h ago';
+    document.getElementById('v-addr').textContent='0x6f50a5…0287d71e';
   }catch(e){}
 }
 
@@ -748,9 +851,54 @@ async function loadAccrual(){
   ctx.fillText(pts.length+' pts',W-46,12);
 }
 
+async function loadPosture(){
+  try{
+    const p=await api('/api/posture');
+    const col={GREEN:'var(--green)',AMBER:'var(--amber)',RED:'var(--red)'}[p.state]||'var(--muted)';
+    const el=document.getElementById('posture');
+    el.style.setProperty('--pc',col);
+    document.getElementById('p-state').textContent=p.state;
+    document.getElementById('p-label').textContent=p.label;
+    document.getElementById('p-desc').textContent=p.description;
+    document.getElementById('p-vol').textContent=p.vol.toFixed(1)+'%';
+    document.getElementById('p-exp').textContent=Math.round(p.lpFactor*100)+'%';
+    document.getElementById('p-sleeve').textContent=p.sleeveActive?'armed':'idle';
+  }catch(e){}
+}
+
+async function loadFairness(){
+  try{
+    const f=await api('/api/fairness');
+    const fresh=f.isFresh;
+    const badge=document.getElementById('fair-badge');
+    badge.textContent=fresh?'FRESH':'STALE';
+    badge.style.background=fresh?'rgba(63,215,122,.14)':'rgba(224,169,60,.14)';
+    badge.style.color=fresh?'var(--green)':'var(--amber)';
+    document.getElementById('fair-sp').textContent=f.sharePriceFair.toFixed(6)+' dUSDC';
+    document.getElementById('fair-onchain').textContent=f.sharePriceRecorded.toFixed(6)+' dUSDC';
+    const dp=document.getElementById('fair-drift');
+    dp.textContent=(f.driftPct>=0?'+':'')+f.driftPct.toFixed(4)+'% ('+(f.driftDusdc>=0?'+':'')+f.driftDusdc.toFixed(4)+' dUSDC)';
+    dp.style.color=fresh?'var(--muted)':'var(--amber)';
+    document.getElementById('fair-nav').textContent=f.navLive.toFixed(2)+' / '+f.navRecorded.toFixed(2)+' dUSDC';
+    const btn=document.getElementById('fair-btn');
+    btn.style.display=fresh?'none':'block';
+  }catch(e){}
+}
+async function fairMark(){
+  const btn=document.getElementById('fair-btn'), msg=document.getElementById('fair-msg');
+  btn.disabled=true; btn.textContent='Marking…';
+  try{
+    const r=await api('/api/fair-mark',{method:'POST'});
+    msg.style.display='block';
+    msg.textContent=r.marked?('✓ marked to fair — '+r.digest.slice(0,16)+'…'):'✓ already fresh — no mark needed';
+    await loadFairness();
+  }catch(e){ msg.style.display='block'; msg.textContent='✗ '+e; }
+  btn.disabled=false; btn.textContent='⚖️ Mark to fair NAV';
+}
+
 async function loadAll(){
   document.getElementById('hd-time').textContent=new Date().toLocaleTimeString();
-  await Promise.allSettled([loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp(),loadVaultState(),loadAccrual()]);
+  await Promise.allSettled([loadPosture(),loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp(),loadVaultState(),loadFairness(),loadAccrual()]);
   renderCapital();
 }
 

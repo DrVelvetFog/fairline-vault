@@ -1,8 +1,8 @@
 {
-  "cv_accuracy": 0.634617,
-  "cv_std": 0.00698,
-  "gb_cv_accuracy": 0.683297,
-  "trained_on": 5731,
+  "cv_accuracy": 0.633046,
+  "cv_std": 0.004375,
+  "gb_cv_accuracy": 0.686403,
+  "trained_on": 5810,
   "features": [
     "realized_vol",
     "trend_pct",
@@ -20,25 +20,25 @@
   "top_features": [
     [
       "mins_to_expiry",
-      -0.7952
+      -0.7742
     ],
     [
       "trend_x_vol",
-      0.511
+      0.5188
     ],
     [
       "trend_pct",
-      0.3586
+      0.3515
     ],
     [
       "realized_vol",
-      0.3514
+      0.3024
     ],
     [
       "range_pct",
-      -0.2697
+      -0.25
     ]
   ],
-  "trained_at": "2026-06-04T13:27:19.921225+00:00",
-  "edge_over_random_pp": 13.46
+  "trained_at": "2026-06-05T08:46:00.942055+00:00",
+  "edge_over_random_pp": 13.3
 }

@@ -1,151 +1,225 @@
-/// FairLine Vault — a multi-user, NAV-based share vault for the LP strategy.
+/// FairLine Vault — a multi-user, NAV-based share vault with SENIOR/JUNIOR
+/// tranches over a single LP strategy (DeepBook Predict PLP).
 ///
-/// Users deposit a quote asset (dUSDC) and receive fungible FLP share tokens
-/// priced at the vault's current net asset value (NAV). They withdraw by
-/// burning shares for a pro-rata claim on assets. The operator holds an
-/// `AdminCap` and uses it to deploy idle reserve into the off-chain LP strategy
-/// (DeepBook Predict PLP) and to settle realized value back, which moves the
-/// share price.
+/// Two share tokens claim one shared asset pool (NAV = reserve + deployed):
+///   • FLP-S (senior)  — principal-protected by junior's first-loss buffer;
+///     earns marked profit with priority **up to a modest target rate**, then
+///     nothing. Lower, predictable-in-practice yield.
+///   • FLP-J (junior)  — absorbs losses first (down to zero before senior takes
+///     any), and earns every dollar of profit above senior's cap. Leveraged.
 ///
-/// NAV = idle reserve + deployed (operator-reported current value of the
-/// strategy's position). Share price = NAV / total FLP supply.
+/// Waterfall (applied only on operator `mark`/`settle`, which is where P&L is
+/// realized — deposits/withdrawals are capital flows, not profit):
+///   profit ΔNAV ≥ 0 : senior += min(ΔNAV, senior_target_accrual); junior gets rest
+///   loss   ΔNAV < 0 : junior absorbs first; senior only once junior_value hits 0
+/// senior_target_accrual = senior_principal × SENIOR_TARGET_BPS × elapsed / year.
 ///
-/// Trust model (honest): cash movements are on-chain and permissionless to
-/// audit; the `deployed` figure is operator-reported but is derived from the
-/// on-chain Predict redemption rate, so it is independently verifiable. This is
-/// an early-stage, UNAUDITED design.
+/// `marked_at` (set from the Clock on every mark/settle) and the `Marked` event
+/// make the mark freshness provable on-chain.
+///
+/// Trust model (honest): cash movements are on-chain and auditable; `deployed`
+/// is operator-reported but derived from the on-chain PLP redemption rate, so it
+/// is independently verifiable. Early-stage, UNAUDITED.
 #[allow(deprecated_usage)]
 module fairline_vault::vault;
 
 use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin, TreasuryCap};
+use sui::clock::Clock;
 use sui::event;
+use fairline_vault::flp_s::{Self, FLP_S, HolderS};
+use fairline_vault::flp_j::{Self, FLP_J, HolderJ};
 
-/// One-time witness; also the FLP share-coin type.
-public struct VAULT has drop {}
-
-/// Shared vault object, generic over the quote asset `T` (e.g. dUSDC).
+/// Shared tranched vault, generic over the quote asset `T` (e.g. dUSDC).
 public struct Vault<phantom T> has key {
     id: UID,
-    reserve: Balance<T>,          // idle quote asset held by the vault
-    treasury: TreasuryCap<VAULT>, // mints / burns FLP shares
-    deployed: u64,                // quote asset out with the strategy, at reported value
-    lifetime_deposited: u64,      // cumulative deposits (stats)
-    lifetime_withdrawn: u64,      // cumulative withdrawals (stats)
+    reserve: Balance<T>,             // idle quote asset held by the vault
+    deployed: u64,                   // quote asset out with the strategy, at reported value
+    s_treasury: TreasuryCap<FLP_S>,  // mints / burns senior shares
+    j_treasury: TreasuryCap<FLP_J>,  // mints / burns junior shares
+    senior_value: u64,               // senior tranche's claim on NAV (junior = NAV − this)
+    senior_principal: u64,           // senior net deposits — the accrual base
+    marked_at: u64,                  // last mark/settle time (ms) — accrual + freshness
+    lifetime_deposited: u64,
+    lifetime_withdrawn: u64,
 }
 
-/// Operator capability — required to deploy/settle strategy capital.
+/// Operator capability — required to deploy/settle/mark strategy capital.
 public struct AdminCap has key, store { id: UID }
+
+// ── Policy constants ─────────────────────────────────────────────────────────
+const SENIOR_TARGET_BPS: u64 = 800;             // senior target yield: 8% APR
+const BPS_DENOM: u128        = 10_000;
+const MS_PER_YEAR: u128      = 31_536_000_000;  // 365d in ms
+
+// Honest-edge capacity: the house edge is capacity-constrained (only so much
+// prediction-market spread to capture), so the vault refuses deposits past what
+// it can productively deploy rather than silently diluting everyone's yield.
+const VAULT_CAPACITY: u64 = 3_000_000_000;      // 3,000 dUSDC (6 decimals)
 
 // ── Errors ──────────────────────────────────────────────────────────────────
 const EZeroAmount: u64 = 0;
 const EInsufficientReserve: u64 = 1;
 const EZeroShares: u64 = 2;
 const EDeployTooLarge: u64 = 3;
+const ECapacityFull: u64 = 4;
 
 // ── Events ──────────────────────────────────────────────────────────────────
-public struct Deposited has copy, drop { depositor: address, amount: u64, shares: u64, nav: u64 }
-public struct Withdrawn has copy, drop { withdrawer: address, shares: u64, amount: u64, nav: u64 }
+public struct Deposited has copy, drop { depositor: address, tranche: u8, amount: u64, shares: u64, senior_value: u64, nav: u64 }
+public struct Withdrawn has copy, drop { withdrawer: address, tranche: u8, shares: u64, amount: u64, senior_value: u64, nav: u64 }
 public struct Deployed has copy, drop { amount: u64, total_deployed: u64 }
-public struct Settled has copy, drop { returned: u64, new_deployed: u64, nav: u64 }
+public struct Settled has copy, drop { returned: u64, new_deployed: u64, senior_value: u64, nav: u64, marked_at: u64 }
+public struct Marked has copy, drop { old_nav: u64, new_nav: u64, senior_value: u64, junior_value: u64, marked_at: u64 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+const TR_SENIOR: u8 = 0;
+const TR_JUNIOR: u8 = 1;
 
-fun init(witness: VAULT, ctx: &mut TxContext) {
-    let (treasury, metadata) = coin::create_currency(
-        witness,
-        6,                       // decimals — match dUSDC
-        b"FLP",
-        b"FairLine LP",
-        b"Share token for the FairLine liquidity vault",
-        option::none(),
-        ctx,
-    );
-    transfer::public_freeze_object(metadata);
+// ── Init / create ────────────────────────────────────────────────────────────
+
+fun init(ctx: &mut TxContext) {
     transfer::transfer(AdminCap { id: object::new(ctx) }, ctx.sender());
-
-    // The Vault itself is created lazily by `create` so its quote type `T` is
-    // chosen at deploy time. Hand the treasury to the creator via a hot-potato
-    // would over-complicate; instead store it in a one-shot holder.
-    transfer::transfer(TreasuryHolder { id: object::new(ctx), treasury }, ctx.sender());
 }
 
-/// Transient holder so the publisher can create the typed Vault in a follow-up tx.
-public struct TreasuryHolder has key { id: UID, treasury: TreasuryCap<VAULT> }
-
-/// Create the shared Vault for quote asset `T`, consuming the treasury holder.
-public fun create<T>(holder: TreasuryHolder, ctx: &mut TxContext) {
-    let TreasuryHolder { id, treasury } = holder;
-    object::delete(id);
+/// Create the shared tranched Vault for quote asset `T`, consuming both tranche
+/// treasury holders minted by `flp_s`/`flp_j` at publish.
+public fun create<T>(hs: HolderS, hj: HolderJ, clock: &Clock, ctx: &mut TxContext) {
     transfer::share_object(Vault<T> {
         id: object::new(ctx),
         reserve: balance::zero<T>(),
-        treasury,
         deployed: 0,
+        s_treasury: flp_s::into_treasury(hs),
+        j_treasury: flp_j::into_treasury(hj),
+        senior_value: 0,
+        senior_principal: 0,
+        marked_at: clock.timestamp_ms(),
         lifetime_deposited: 0,
         lifetime_withdrawn: 0,
     });
 }
 
-// ── Views ──────────────────────────────────────────────────────────────────────
+// ── Views ─────────────────────────────────────────────────────────────────────
 
 /// Total assets under management = idle reserve + deployed (reported) value.
-public fun nav<T>(v: &Vault<T>): u64 {
-    balance::value(&v.reserve) + v.deployed
-}
-
-public fun total_shares<T>(v: &Vault<T>): u64 { coin::total_supply(&v.treasury) }
+public fun nav<T>(v: &Vault<T>): u64 { balance::value(&v.reserve) + v.deployed }
 public fun reserve_value<T>(v: &Vault<T>): u64 { balance::value(&v.reserve) }
 public fun deployed<T>(v: &Vault<T>): u64 { v.deployed }
+public fun senior_value<T>(v: &Vault<T>): u64 { v.senior_value }
+public fun junior_value<T>(v: &Vault<T>): u64 { nav(v) - v.senior_value }
+public fun senior_principal<T>(v: &Vault<T>): u64 { v.senior_principal }
+public fun senior_shares<T>(v: &Vault<T>): u64 { coin::total_supply(&v.s_treasury) }
+public fun junior_shares<T>(v: &Vault<T>): u64 { coin::total_supply(&v.j_treasury) }
+public fun marked_at<T>(v: &Vault<T>): u64 { v.marked_at }
+public fun capacity<T>(_v: &Vault<T>): u64 { VAULT_CAPACITY }
 
-/// Shares minted for `amount` at current NAV (bootstraps 1:1 on an empty vault).
-public fun shares_for<T>(v: &Vault<T>, amount: u64): u64 {
-    let supply = total_shares(v);
-    let aum = nav(v);
-    if (supply == 0 || aum == 0) { amount }
-    else { (((amount as u128) * (supply as u128)) / (aum as u128)) as u64 }
-}
+fun min_u64(a: u64, b: u64): u64 { if (a < b) a else b }
 
-// ── User: deposit / withdraw ────────────────────────────────────────────────────
+// ── User: deposit ────────────────────────────────────────────────────────────
 
-/// Deposit `coin` of quote asset, receive FLP shares at current NAV.
-public fun deposit<T>(v: &mut Vault<T>, coin: Coin<T>, ctx: &mut TxContext): Coin<VAULT> {
+/// Deposit into the SENIOR tranche; receive FLP-S at the senior share price.
+public fun deposit_senior<T>(v: &mut Vault<T>, coin: Coin<T>, ctx: &mut TxContext): Coin<FLP_S> {
     let amount = coin::value(&coin);
     assert!(amount > 0, EZeroAmount);
+    assert!(nav(v) + amount <= VAULT_CAPACITY, ECapacityFull);
 
-    let shares = shares_for(v, amount);
+    let supply = coin::total_supply(&v.s_treasury);
+    let shares = if (supply == 0 || v.senior_value == 0) amount
+        else { (((amount as u128) * (supply as u128)) / (v.senior_value as u128)) as u64 };
     assert!(shares > 0, EZeroShares);
 
     balance::join(&mut v.reserve, coin::into_balance(coin));
+    v.senior_value = v.senior_value + amount;
+    v.senior_principal = v.senior_principal + amount;
     v.lifetime_deposited = v.lifetime_deposited + amount;
 
-    let out = coin::mint(&mut v.treasury, shares, ctx);
-    event::emit(Deposited { depositor: ctx.sender(), amount, shares, nav: nav(v) });
+    let out = coin::mint(&mut v.s_treasury, shares, ctx);
+    event::emit(Deposited { depositor: ctx.sender(), tranche: TR_SENIOR, amount, shares, senior_value: v.senior_value, nav: nav(v) });
     out
 }
 
-/// Burn FLP `shares` for a pro-rata claim, paid from idle reserve.
-/// Reverts if the reserve can't cover the claim (operator must `settle` first).
-public fun withdraw<T>(v: &mut Vault<T>, shares: Coin<VAULT>, ctx: &mut TxContext): Coin<T> {
+/// Deposit into the JUNIOR tranche; receive FLP-J at the junior share price.
+public fun deposit_junior<T>(v: &mut Vault<T>, coin: Coin<T>, ctx: &mut TxContext): Coin<FLP_J> {
+    let amount = coin::value(&coin);
+    assert!(amount > 0, EZeroAmount);
+    assert!(nav(v) + amount <= VAULT_CAPACITY, ECapacityFull);
+
+    let jv_before = nav(v) - v.senior_value;   // junior value before this deposit
+    let supply = coin::total_supply(&v.j_treasury);
+    let shares = if (supply == 0 || jv_before == 0) amount
+        else { (((amount as u128) * (supply as u128)) / (jv_before as u128)) as u64 };
+    assert!(shares > 0, EZeroShares);
+
+    balance::join(&mut v.reserve, coin::into_balance(coin));   // NAV up by amount; senior_value unchanged → junior up by amount
+    v.lifetime_deposited = v.lifetime_deposited + amount;
+
+    let out = coin::mint(&mut v.j_treasury, shares, ctx);
+    event::emit(Deposited { depositor: ctx.sender(), tranche: TR_JUNIOR, amount, shares, senior_value: v.senior_value, nav: nav(v) });
+    out
+}
+
+// ── User: withdraw ───────────────────────────────────────────────────────────
+
+/// Burn FLP-S for a pro-rata claim on the senior tranche, paid from reserve.
+public fun withdraw_senior<T>(v: &mut Vault<T>, shares: Coin<FLP_S>, ctx: &mut TxContext): Coin<T> {
     let n = coin::value(&shares);
     assert!(n > 0, EZeroShares);
+    let supply = coin::total_supply(&v.s_treasury);
 
-    let supply = total_shares(v);
-    let amount = (((n as u128) * (nav(v) as u128)) / (supply as u128)) as u64;
+    let amount = (((n as u128) * (v.senior_value as u128)) / (supply as u128)) as u64;
     assert!(amount <= balance::value(&v.reserve), EInsufficientReserve);
 
-    coin::burn(&mut v.treasury, shares);
+    // Retire senior principal pro-rata to the shares burned (gains sit above principal).
+    let prin_red = (((n as u128) * (v.senior_principal as u128)) / (supply as u128)) as u64;
+    v.senior_principal = v.senior_principal - min_u64(v.senior_principal, prin_red);
+    v.senior_value = v.senior_value - amount;
     v.lifetime_withdrawn = v.lifetime_withdrawn + amount;
 
+    coin::burn(&mut v.s_treasury, shares);
     let out = coin::take(&mut v.reserve, amount, ctx);
-    event::emit(Withdrawn { withdrawer: ctx.sender(), shares: n, amount, nav: nav(v) });
+    event::emit(Withdrawn { withdrawer: ctx.sender(), tranche: TR_SENIOR, shares: n, amount, senior_value: v.senior_value, nav: nav(v) });
     out
 }
 
-// ── Operator: deploy / settle strategy capital ──────────────────────────────────
+/// Burn FLP-J for a pro-rata claim on the junior tranche, paid from reserve.
+public fun withdraw_junior<T>(v: &mut Vault<T>, shares: Coin<FLP_J>, ctx: &mut TxContext): Coin<T> {
+    let n = coin::value(&shares);
+    assert!(n > 0, EZeroShares);
+    let supply = coin::total_supply(&v.j_treasury);
+
+    let jv = nav(v) - v.senior_value;
+    let amount = (((n as u128) * (jv as u128)) / (supply as u128)) as u64;
+    assert!(amount <= balance::value(&v.reserve), EInsufficientReserve);
+
+    v.lifetime_withdrawn = v.lifetime_withdrawn + amount;
+    coin::burn(&mut v.j_treasury, shares);
+    let out = coin::take(&mut v.reserve, amount, ctx);   // NAV down by amount; senior_value unchanged → junior down by amount
+    event::emit(Withdrawn { withdrawer: ctx.sender(), tranche: TR_JUNIOR, shares: n, amount, senior_value: v.senior_value, nav: nav(v) });
+    out
+}
+
+// ── Waterfall ────────────────────────────────────────────────────────────────
+
+/// Allocate the NAV change since the last mark between the tranches and stamp
+/// `marked_at`. Profit goes to senior up to its target accrual, then to junior;
+/// losses hit junior first, senior only once junior is wiped.
+fun apply_pnl<T>(v: &mut Vault<T>, old_nav: u64, new_nav: u64, now_ms: u64) {
+    let elapsed = if (now_ms > v.marked_at) ((now_ms - v.marked_at) as u128) else 0;
+    if (new_nav >= old_nav) {
+        let profit = (new_nav - old_nav) as u128;
+        // senior target accrual over the elapsed window on senior principal
+        let target = (v.senior_principal as u128) * (SENIOR_TARGET_BPS as u128) * elapsed / BPS_DENOM / MS_PER_YEAR;
+        let senior_gain = if (profit < target) profit else target;
+        v.senior_value = v.senior_value + (senior_gain as u64);
+    } else {
+        // loss: junior absorbs first; senior only takes the residual once junior = 0
+        if (new_nav < v.senior_value) { v.senior_value = new_nav; };
+    };
+    v.marked_at = now_ms;
+}
+
+// ── Operator: deploy / settle / mark ─────────────────────────────────────────
 
 /// Move `amount` of idle reserve out to run the LP strategy. Value is conserved
-/// (reserve down, deployed up), so NAV and share price are unchanged.
+/// (reserve down, deployed up), so NAV and both tranches are unchanged.
 public fun deploy<T>(_: &AdminCap, v: &mut Vault<T>, amount: u64, ctx: &mut TxContext): Coin<T> {
     assert!(amount > 0, EZeroAmount);
     assert!(amount <= balance::value(&v.reserve), EInsufficientReserve);
@@ -155,24 +229,29 @@ public fun deploy<T>(_: &AdminCap, v: &mut Vault<T>, amount: u64, ctx: &mut TxCo
     out
 }
 
-/// Return strategy capital and report the remaining deployed value.
-/// Realized P&L (returned coin minus the drop in `deployed`) flows into the
-/// reserve and moves the share price. `new_deployed` is the operator's current
-/// valuation of the still-deployed position (verifiable from on-chain PLP rate).
-public fun settle<T>(_: &AdminCap, v: &mut Vault<T>, coin: Coin<T>, new_deployed: u64) {
+/// Return strategy capital and report remaining deployed value; runs the
+/// waterfall over the realized P&L and stamps the mark time.
+public fun settle<T>(_: &AdminCap, v: &mut Vault<T>, coin: Coin<T>, new_deployed: u64, clock: &Clock) {
     let returned = coin::value(&coin);
     assert!(new_deployed <= v.deployed + returned, EDeployTooLarge);
+    let old_nav = nav(v);
     balance::join(&mut v.reserve, coin::into_balance(coin));
     v.deployed = new_deployed;
-    event::emit(Settled { returned, new_deployed, nav: nav(v) });
+    let new_nav = nav(v);
+    apply_pnl(v, old_nav, new_nav, clock.timestamp_ms());
+    event::emit(Settled { returned, new_deployed, senior_value: v.senior_value, nav: new_nav, marked_at: v.marked_at });
 }
 
-/// Update only the reported value of the deployed position (mark-to-market),
-/// without moving cash — lets NAV reflect PLP accrual between settlements.
-public fun mark<T>(_: &AdminCap, v: &mut Vault<T>, new_deployed: u64) {
+/// Mark-to-market the deployed value (no cash move); runs the waterfall over the
+/// NAV change and stamps `marked_at` so freshness is provable on-chain.
+public fun mark<T>(_: &AdminCap, v: &mut Vault<T>, new_deployed: u64, clock: &Clock) {
+    let old_nav = nav(v);
     v.deployed = new_deployed;
+    let new_nav = nav(v);
+    apply_pnl(v, old_nav, new_nav, clock.timestamp_ms());
+    event::emit(Marked { old_nav, new_nav, senior_value: v.senior_value, junior_value: new_nav - v.senior_value, marked_at: v.marked_at });
 }
 
 // ── Test-only init ──────────────────────────────────────────────────────────────
 #[test_only]
-public fun init_for_testing(ctx: &mut TxContext) { init(VAULT {}, ctx) }
+public fun init_for_testing(ctx: &mut TxContext) { init(ctx) }

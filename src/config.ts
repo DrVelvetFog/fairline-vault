@@ -18,12 +18,24 @@ export const DUSDC_DECIMALS    = 6;
 // PLP — liquidity provider token (same package as Predict)
 export const PLP_TYPE = `${PREDICT_PACKAGE}::plp::PLP`;
 
-// ── FairLine Vault (our own Move contract — multi-user share vault) ───────────
-// Published to testnet; users deposit dUSDC → FLP shares → pro-rata withdraw.
-export const VAULT_PACKAGE   = process.env.VAULT_PACKAGE   ?? '0xfe5abfde639a8ea1a208808578f1c7f79f4aa94cf15a77f169cdc8f3d8c0ccfb';
-export const VAULT_OBJECT    = process.env.VAULT_OBJECT    ?? '0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e';
-export const VAULT_ADMIN_CAP = process.env.VAULT_ADMIN_CAP ?? '0xd92a858e5cc2ff72c56c0436f66ee592dcf0c92dcbc3877817eebd0b91eec9b2';
-export const FLP_TYPE        = `${VAULT_PACKAGE}::vault::VAULT`;
+// ── FairLine Vault (our own Move contract — tranched multi-user share vault) ──
+// Published to testnet; users deposit dUSDC into the SENIOR (FLP-S, protected)
+// or JUNIOR (FLP-J, first-loss/leveraged) tranche → pro-rata withdraw.
+// VAULT_PACKAGE = original publish id — defines the FLP-S/FLP-J/Vault *types*.
+// VAULT_PACKAGE_LATEST = newest upgraded id — target for *function calls* (new code).
+export const VAULT_PACKAGE        = process.env.VAULT_PACKAGE        ?? '0x8c5c7e1205468970100265c17a8c9a80fe43d67bfed0230cb807f1f75e7029e4';
+export const VAULT_PACKAGE_LATEST = process.env.VAULT_PACKAGE_LATEST ?? '0x51be19ea72cff8d55fe848c1565d19eda93f31ab79cbed8d9801671006c57438';
+export const VAULT_OBJECT    = process.env.VAULT_OBJECT    ?? '0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e';
+export const VAULT_ADMIN_CAP = process.env.VAULT_ADMIN_CAP ?? '0xc0e47b0700b566ca4d02e974a3739a645d668a823ffbf8bc2c1c88bd755e2196';
+export const FLP_S_TYPE      = `${VAULT_PACKAGE}::flp_s::FLP_S`;   // senior share (original id)
+export const FLP_J_TYPE      = `${VAULT_PACKAGE}::flp_j::FLP_J`;   // junior share (original id)
+
+// On-chain deposit capacity (mirror of VAULT_CAPACITY in vault.move) — the vault
+// refuses deposits past this so the house edge isn't diluted past what it absorbs.
+export const VAULT_CAPACITY  = 3000;   // dUSDC
+
+// Old single-tranche vault (pre-2026-06-07), left intact on-chain, no longer wired:
+//   pkg 0xfe5abfde…ccfb · vault 0x71a3…fb7e · adminCap 0xd92a…c9b2 · FLP <pkg>::vault::VAULT
 
 // ── Vault policy ─────────────────────────────────────────────────────────────
 
