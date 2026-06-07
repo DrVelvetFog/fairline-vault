@@ -19,6 +19,11 @@ import { computeFeatures } from './features.js';
 import { decide, ping, AllocationDecision, CycleContext } from './model.js';
 
 import { predict as mlPredict, formatPrediction } from './ml-model.js';
+import { updateGate, exposureFactor } from './gate.js';
+
+// Directional sleeve retired — the spread structurally beats direction; the ML
+// signal now feeds the defensive gate only. Flip to true to re-enable research.
+const SLEEVE_ENABLED = false;
 import {
   buildDepositAndMint, buildDepositAndMintRange, buildSupply,
   buildMint, buildGetTradeAmounts, buildSupplyFromManager,
@@ -369,7 +374,10 @@ export async function runCycle(): Promise<void> {
   // Target is a share of TOTAL capital (liquid + already in PLP), so the position
   // converges to LP_TARGET_PCT of everything, not of the shrinking liquid balance.
   const totalCapital = totalH + currentPlp;
-  const lpFactor = computeLpExposureFactor(vol, mlPrediction);
+  // Advance the smoothed/hysteretic gate (60s cadence) and use its floored factor.
+  const gate = updateGate(vol);
+  const conviction = Math.min(1, Math.abs(mlPrediction.prob_up - 0.5) * 2);
+  const lpFactor = exposureFactor(gate.regime, 1 - 0.3 * conviction);
   const lpTarget = Math.min(totalCapital * LP_TARGET_PCT * lpFactor, MAX_PLP_DUSDC);
   const lpDelta  = lpTarget - currentPlp;
   console.log(`\n[LP engine] exposure factor ${lpFactor.toFixed(2)} → target ${lpTarget.toFixed(1)} dUSDC | current ${currentPlp.toFixed(1)} | delta ${lpDelta >= 0 ? '+' : ''}${lpDelta.toFixed(1)}`);
@@ -394,7 +402,7 @@ export async function runCycle(): Promise<void> {
     skip_reason: 'sleeve idle',
   };
 
-  if (vol < HIGH_VOL_THRESHOLD && mlPrediction.confidence === 'high' && !alreadyEntered) {
+  if (SLEEVE_ENABLED && vol < HIGH_VOL_THRESHOLD && mlPrediction.confidence === 'high' && !alreadyEntered) {
     ctx.ml_prediction = mlPrediction;
     console.log('\n[sleeve] calm + high-confidence ML — consulting hermes3 (capped)…');
     decision = await decide(ctx);

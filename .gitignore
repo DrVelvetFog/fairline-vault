@@ -29,3 +29,4 @@ contracts/**/Published.toml
 
 # Local backups — never commit
 *.old-single-tranche
+logs/gate-state.json

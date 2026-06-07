@@ -19,9 +19,8 @@
 
 import { computeFeatures } from './features.js';
 import { predict as mlPredict, MLPrediction } from './ml-model.js';
-import { computeLpExposureFactor } from './cycle.js';
+import { readGate, exposureFactor } from './gate.js';
 import { getNearestActiveOracle, getPriceHistory, getLatestPrice } from './indexer.js';
-import { HIGH_VOL_THRESHOLD, EXTREME_VOL_THRESHOLD } from './config.js';
 
 export type PostureState = 'GREEN' | 'AMBER' | 'RED';
 
@@ -50,43 +49,39 @@ const COLORS: Record<PostureState, string> = {
  * so the banner and the bot can never drift apart.
  */
 export function classifyPosture(vol: number, ml: MLPrediction): Posture {
-  const lpFactor = computeLpExposureFactor(vol, ml);
-  // Sleeve arms on the same condition as the cycle (calm + high ML conviction).
-  const sleeveActive = vol < HIGH_VOL_THRESHOLD && ml.confidence === 'high';
+  // Smoothed, hysteretic regime (no chatter) + floored exposure (always earn some spread).
+  const gate = readGate(vol);
+  const state = gate.regime;
+  const v = gate.smoothedVol;
+  const conviction = Math.min(1, Math.abs(ml.prob_up - 0.5) * 2);
+  const mlAdjust = 1 - 0.3 * conviction;
+  const lpFactor = exposureFactor(state, mlAdjust);
+  const pct = Math.round(lpFactor * 100);
 
-  let state: PostureState;
   let label: string;
   let description: string;
-
-  if (vol >= EXTREME_VOL_THRESHOLD) {
-    state = 'RED';
-    label = 'De-risked';
+  if (state === 'RED') {
+    label = 'Defensive floor';
     description =
-      `Extreme volatility (${vol.toFixed(1)}%). The vault has pulled liquidity ` +
-      `out of harm's way — capital sits in reserve until markets calm. No new ` +
-      `house exposure.`;
-  } else if (vol >= HIGH_VOL_THRESHOLD) {
-    state = 'AMBER';
-    label = 'Defensive';
+      `Extreme volatility (${v.toFixed(1)}%). Exposure cut to a defensive floor ` +
+      `(~${pct}% of target) — the house keeps earning the wide spread while the ` +
+      `junior tranche absorbs the directional tail risk.`;
+  } else if (state === 'AMBER') {
+    label = 'Reduced';
     description =
-      `Elevated volatility (${vol.toFixed(1)}%). Liquidity provision is reduced to ` +
-      `~${Math.round(lpFactor * 100)}% of target and the directional sleeve is idle — ` +
-      `the house is earning spread only.`;
+      `Elevated volatility (${v.toFixed(1)}%). Liquidity reduced to ~${pct}% of ` +
+      `target — the house earns the spread with less directional exposure.`;
   } else {
-    state = 'GREEN';
     label = 'Full house';
-    description =
-      `Calm markets (${vol.toFixed(1)}%). Full liquidity provision at ` +
-      `~${Math.round(lpFactor * 100)}% of target; directional sleeve is ` +
-      `${sleeveActive ? 'armed (calm + high-confidence signal)' : 'on standby'}.`;
+    description = `Calm markets (${v.toFixed(1)}%). Full liquidity provision at ~${pct}% of target.`;
   }
 
   return {
     state, label, description,
     color: COLORS[state],
-    vol,
+    vol: v,
     lpFactor,
-    sleeveActive,
+    sleeveActive: false,   // directional sleeve retired — the signal feeds the gate only
     mlDirection:  ml.direction,
     mlConfidence: ml.confidence,
     asOf: new Date().toISOString(),
