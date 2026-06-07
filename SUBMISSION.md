@@ -2,139 +2,161 @@
 
 *Sui Overflow 2026 · DeepBook track · testnet*
 
-> An autonomous, risk-managed liquidity vault for DeepBook's on-chain prediction
-> markets. FairLine earns the market's structural house edge by providing
-> liquidity (PLP), and uses a machine-learning directional model **defensively**
-> — to gate that liquidity exposure, not to gamble with it. Every decision and
-> every trade is on-chain and verifiable.
+> A tranched, risk-managed liquidity vault that lets anyone **be the house** of
+> DeepBook's on-chain prediction markets — and provides liquidity directly to
+> DeepBook's core orderbook. One ML/volatility risk brain governs both venues.
+> Every decision and every transaction is on-chain and verifiable.
+
+🌐 **[fairline-vault.netlify.app](https://fairline-vault.netlify.app)** · 🎬 **[Demo](https://youtu.be/dJPlnTcuF5g)** · 🔎 **[Vault on-chain](https://suiscan.xyz/testnet/object/0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e)**
 
 ---
 
 ## The problem (real-world application)
 
 DeepBook's Predict markets are a new on-chain primitive: BTC binary options that
-settle every 15 minutes. Like every options market, there are two roles — the
-**traders** who take directional bets, and the **house** (the liquidity pool,
-PLP) that takes the other side and earns the spread.
+settle every 15 minutes. Like every options market there are two roles — the
+**traders** who take directional bets, and the **house** (the liquidity pool)
+that takes the other side and earns the spread.
 
 Two real problems follow:
 
-1. **These markets need liquidity to function**, and providing it well is
-   non-trivial — it requires automation, risk management, and capital discipline
-   that most participants don't have.
+1. **These markets need liquidity to function**, and providing it well requires
+   automation, risk management, and capital discipline most participants lack.
 2. **Directional trading these markets is a losing game for almost everyone** —
    the spread is a structural edge for the house, against the trader.
 
-FairLine is infrastructure for the *profitable, durable* side of that trade: an
-automated, risk-gated liquidity provider, built so the strategy and its results
-are fully transparent on-chain.
+FairLine is infrastructure for the *profitable, durable* side of that trade,
+packaged so anyone can join in one click — with the risk professionally managed
+and the results fully verifiable on-chain.
 
 ## The honest journey — why we provide liquidity instead of betting
 
 We did not start here, and the pivot is the most important thing we learned.
 
-FairLine began as an ML-driven **directional** vault — a model allocating capital
-across BTC binaries each cycle. In backtest it looked strong. **Live on testnet,
-it lost money**: a 41.3% win rate against a ~51.5% break-even, −749 dUSDC
-realized. The model was ~63% accurate at *direction* on cross-validation, yet
-still lost — because the 2% spread is wider than the edge.
+FairLine began as an ML-driven **directional** vault. In backtest it looked
+strong. **Live on testnet it lost money**: a 41.3% win rate against ~51.5%
+break-even, −749 dUSDC realized. The model was ~63% accurate at *direction* on
+cross-validation, yet still lost — the 2% spread is wider than the edge.
 
-That result is not buried; it is the thesis. We asked: *where did that money
-go?* On-chain, the answer is exact — it flowed into the **PLP pool**, the house.
-So we re-weighted FairLine from the (losing) player to the (winning) house. The
-same ML signal that couldn't profit *betting* direction is genuinely valuable
-used *defensively*: a strong predicted move is precisely when the house carries
-the most directional risk, so we scale liquidity exposure down. A losing alpha
-model becomes a useful risk model.
+That result is the thesis, not a footnote. We asked *where did the money go?* —
+on-chain, the answer is exact: into the **house**. So we re-weighted FairLine
+from the losing player to the winning house, and repurposed the ML signal
+**defensively** — a strong predicted move is exactly when the house carries the
+most directional risk, so we scale exposure down. A losing alpha model becomes a
+useful risk model.
 
-## What FairLine does now
+## What FairLine is now — a structured product, not just a bot
 
-- **LP-primary.** Targets ~70% of capital supplied to PLP, earning the vault's
-  spread as the house.
-- **ML/vol-gated exposure.** A trained logistic model (12 features, 5-fold CV)
-  plus realized-volatility regime scale *how much* liquidity we hold. We scale
-  position by risk rather than thrashing in and out — justified directly by
-  on-chain data (see below).
-- **Capped experimental directional sleeve.** Directional trading survives as a
-  small, hard-capped (≤15 dUSDC/position, ≤45/cycle) research sleeve, only in
-  calm regimes with high model confidence. Its full P&L is reported honestly.
-- **Multi-user share vault (our own Move contract, live on testnet).** Anyone
-  deposits dUSDC and receives fungible FLP shares priced at NAV; withdraws
-  pro-rata — through a real wallet-connect dApp, not a script. The operator runs
-  the LP strategy on the pooled capital. This turns FairLine from a single bot
-  into a **product with depositors and real TVL** — deposit → deploy to PLP →
-  earn the house edge → share price rises. Verified end to end on-chain **via the
-  live dApp on a mobile device + Slush wallet**: deposit `8mfSbAJd…` → FLP minted,
-  withdraw `djf8x61t…` → dUSDC returned (vault capital deployed to PLP `7J1oNLrk…`).
-  - **Who it's for:** anyone who wants prediction-market yield without running a
-    bot, holding keys, or sizing risk.
-  - **Verifiable NAV:** the FLP share price is the vault's NAV derived from the
-    on-chain PLP redemption rate — verifiable by anyone, not operator-set.
-    (Fully-trustless on-chain NAV inside Move is on the roadmap.)
+FairLine grew from a single LP vault into a full on-chain structured product.
+Six features, each built and verified live:
 
-## Verifiable on-chain facts (testnet, at time of writing)
+1. **🟢🟡🔴 Risk-state posture** — one ML/volatility gate (logistic model, 12
+   features, 5-fold CV + realized-vol regime), surfaced as a live Green/Amber/Red
+   signal that governs *every* venue's exposure.
+2. **⚖️ Provably-fair pricing** — deposits and withdrawals price at a
+   *freshly-marked* NAV, recomputed independently from the on-chain PLP rate. The
+   live drift between the price the contract would charge and the honest one is
+   shown and correctable on-chain — you never enter or exit at a stale price.
+3. **🏦 Senior / junior tranches** — our Move vault splits into FLP-S and FLP-J. A
+   capped profit-share waterfall gives **senior** principal protection + a capped
+   yield (≤8% APR); **junior** absorbs losses first and takes the leveraged
+   upside. Structured credit applied to a prediction-market house — pick your risk.
+4. **📊 Capacity cap** — the house edge is capacity-constrained, so an on-chain
+   `VAULT_CAPACITY` **rejects deposits past productive capacity** rather than
+   silently diluting everyone's yield. A vault that closes the door when adding
+   money would hurt you.
+5. **🔁 House flywheel** — FairLine routes a slice of its edge into a rebate pool
+   and pays predictors pro-rata to their real on-chain trading volume. More
+   rebates → more volume → more edge → more rebates. (Live: 22 real predictors
+   paid in one PTB.)
+6. **📖 Direct DeepBook CLOB maker** — the same risk gate runs a posture-gated,
+   inventory-skewed **market maker placing real limit orders on DeepBook's core
+   orderbook** (the whitelisted DEEP/SUI pool). *One risk brain, two venues:* the
+   prediction market and the orderbook.
 
-| Fact | Value | Source |
-|---|---|---|
-| PLP redemption rate | **1.003154** dUSDC/PLP | `Predict` object on-chain |
-| House edge realized to date | **+0.315%** | (rate − 1) |
-| Vault reserves | ~1,011,552 dUSDC | vault balance |
-| Vault open liability | **0.087% of reserves** | `total_mtm` / reserves |
-| House spread | 2% base (scales with utilization) | `pricing_config` |
-| FairLine capital | ~4,253 dUSDC (conserved end-to-end) | manager + wallet + PLP |
-| Directional sleeve P&L (honest) | −749 dUSDC, 41.3% win rate | settled positions |
+Depositors interact through a real **wallet-connect dApp** (Slush), not a script:
+deposit dUSDC into a tranche → receive FLP-S/FLP-J → withdraw pro-rata, any time.
 
-The vault's open liability being ~0.09% of reserves is *why* sticky liquidity
-(never force-exiting) is the right design — forced exits would only churn gas.
-This is a data-driven risk decision, not an assumption.
+## What makes it unique
 
-Representative live LP supply transactions:
-`6LynpESWJTCc557v3FTTg47ok4dNxtjVFeCJvH7jhe6v`,
-`CznuJcDuA8dGL7p4FeizQTmBJdr5PjFWH2dircR8YiAw`,
-`6RCL69MDBKb9YhFmcPDmPVNf3THrZf3XaxmVrKmDT4Xz`.
+| | Generic vaults (Yearn) | "Be the house" LP vaults (GMX **GLP**, Jupiter **JLP**) | Tranching protocols (BarnBridge, Idle) | **FairLine** |
+|---|---|---|---|---|
+| Yield source | aggregated farm yield | perp-trader losses | lending yield | **prediction-market edge + CLOB spread** |
+| Tranches | ❌ | ❌ single class | ✅ | ✅ |
+| ML risk gate | ❌ | ❌ | ❌ | ✅ |
+| Provably-fair pricing | ❌ | partial | ❌ | ✅ |
+| Capacity cap | ❌ | ❌ | ❌ | ✅ |
+| Rebate flywheel | ❌ | ❌ | ❌ | ✅ |
+| Direct DeepBook orderbook | — | — | — | ✅ |
 
-## Technical implementation
+**"GLP for prediction markets — but tranched, risk-gated, provably-fair-priced,
+capacity-capped, with a predictor rebate flywheel, and a live DeepBook CLOB
+maker."** The individual ideas exist in DeFi; the combination, over this
+underlying, on Sui, does not exist anywhere else.
 
-- **Our own Move contract:** a NAV-based multi-user share vault (`fairline_vault`)
-  published to testnet — deposit/withdraw/deploy/settle, fungible FLP shares,
-  passing unit tests, internal security review. Composes atomically with Predict
-  (one PTB: `vault.deploy` → `predict.supply`).
-- **Meaningful Sui/DeepBook integration:** PTBs for `supply`, atomic
-  `withdraw`→`supply` straight from the PredictManager, mint-from-Manager-balance,
-  and `get_trade_amounts` devInspect pricing previews — all against the live
-  Predict protocol.
-- **ML retraining flywheel:** continuously retrains on settled oracles
-  (3,400+ to date) — a living model, not a static artifact.
-- **Reliability:** runs under pm2 (autonomous watcher, dashboard, hourly P&L
-  summary); indexer calls retry transient 5xx; jobs are crash-hardened.
-- **Safety:** every executing PTB is devInspect-validated first; absolute risk
-  caps bound the directional sleeve.
+## Meaningful DeepBook integration (the track, directly)
+
+- **Predict liquidity** — atomic PTBs for `supply`, withdraw→supply straight from
+  the PredictManager, and `get_trade_amounts` devInspect pricing previews against
+  the live Predict protocol.
+- **Core orderbook (CLOB)** — FairLine places, cancels, and manages **real limit
+  orders on DeepBook v3's order book** via raw PTBs (`pool::place_limit_order`,
+  `cancel_all_orders`, `mid_price`), through a DeepBook BalanceManager, on the
+  whitelisted DEEP/SUI pool. This is direct, verifiable liquidity provision on
+  DeepBook's central limit order book — the heart of the track.
+
+## Our own Move contracts (live on testnet)
+
+A tranched, NAV-based share vault (`fairline_vault`) — `vault.move` +
+`flp_s.move` / `flp_j.move` (tranche tokens) + `rewards.move` (flywheel pool),
+**6 passing unit tests** across the package, two clean package upgrades
+(capacity, then rewards). Composes atomically with Predict (one PTB:
+`vault.deploy` → `predict.supply`). Mark/settle run the senior/junior waterfall
+and stamp `marked_at` so freshness is provable on-chain.
+
+## Verified live on-chain
+
+| Step | Transaction |
+|---|---|
+| Senior deposit → FLP-S | [`2m2UvMWE…`](https://suiscan.xyz/testnet/tx/2m2UvMWEUNk6PksXpz6vHdFAqjYT53hxXtmq4scoNynE) |
+| Junior deposit → FLP-J | [`9wdQYzuv…`](https://suiscan.xyz/testnet/tx/9wdQYzuvPQAy3eYf2WJXxq77xsv9AHkCTmbcMRH93gBu) |
+| Junior withdraw (funds not trapped) | [`Gd3zGDBx…`](https://suiscan.xyz/testnet/tx/Gd3zGDBxiackZhdhLFRC2idTtpJQHhxKfHgBTt8gxYpd) |
+| Flywheel — rebates to 22 predictors | [`FjTaze5q…`](https://suiscan.xyz/testnet/tx/FjTaze5qYkY81q4zHKUBuFt9a2M8yGTi27YCesdnRWRo) |
+| **Live DeepBook CLOB limit order** | [`8Wrs564E…`](https://suiscan.xyz/testnet/tx/8Wrs564ExgE6B344iiSfhTwp6cKNeu4vPtYVTNbtw5dH) |
+
+Plus a 52-depositor simulation across both tranches, taking the vault to a real
+multi-user TVL. NAV is derived from the on-chain PLP redemption rate — verifiable
+by anyone, not operator-set.
 
 ## Transparency as a product
 
 DeFi is full of unverifiable performance claims. FairLine logs **every** cycle
-decision (`logs/cycles.jsonl`: LP factor, target, action) and every transaction
-digest, and the dashboard surfaces the live PLP position, redemption-rate
-accrual, and an honest split between LP income and the experimental sleeve. The
-claim is not "trust us, we win" — it's "verify us on-chain."
+decision and transaction digest; the dashboard surfaces the live posture, fair vs
+on-chain price, tranche split, capacity, the flywheel pool, and the DeepBook
+maker's resting orders. The claim is not "trust us, we win" — it's "verify us
+on-chain." We say testnet and unaudited, plainly.
 
 ## Long-term vision
 
-The allocation brain is swappable. Today it's an ML risk-gate over LP; the same
-vault framework can host other strategies, scale to mainnet DeepBook markets, and
-let others deploy capital into a transparent, risk-managed liquidity layer for
-on-chain prediction markets.
+The risk brain is swappable and already governs two venues; the same vault
+framework scales to mainnet DeepBook markets and can host other strategies. Next:
+fully-trustless on-chain NAV in Move, depositor-funded CLOB market-making (once a
+dUSDC↔DeepBook market exists), and senior coverage enforced on-chain. DeepBook
+Predict is testnet-only today, so mainnet is upstream-blocked, not faked.
 
 ---
 
 ### How this maps to the judging criteria
 
 - **Real-World Application (50%):** solves a real need (liquidity for nascent
-  on-chain markets) on the durable side of the trade; the value proposition is
-  verifiable on-chain rather than asserted.
-- **Technical Implementation (20%):** deep, live DeepBook/Sui integration; an ML
-  risk engine; reliable autonomous operation.
-- **Product & UX (20%):** one-screen dashboard, honest live reporting, one-click
-  cycle.
-- **Presentation & Vision (10%):** a clear, honest story — player → house — with
-  a credible path beyond the hackathon.
+  on-chain markets) on the durable side of the trade, as a structured product
+  ordinary users can actually hold (senior = safe, junior = leveraged) — value
+  verifiable on-chain, not asserted.
+- **Technical Implementation (20%):** **direct DeepBook CLOB integration** (raw
+  PTBs, BalanceManager, live orders) *and* Predict liquidity; four Move modules
+  with a profit-share waterfall, capacity cap, and rewards; an ML risk engine;
+  reliable autonomous operation; two clean package upgrades.
+- **Product & UX (20%):** wallet-connect tranche dApp on mobile, a live dashboard
+  showing all six features, honest reporting, one-click flows.
+- **Presentation & Vision (10%):** a clear, honest story — player → house →
+  structured product — with a credible path beyond the hackathon.
