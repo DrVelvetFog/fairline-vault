@@ -57,6 +57,32 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },
     {
+      name:          'fairline-vault-engine',
+      script:        'npx',
+      args:          'tsx src/vault-engine.ts',
+      cwd:           __dirname,
+      interpreter:   'none',
+      autorestart:   false,            // one-shot job
+      cron_restart:  '*/10 * * * *',   // posture-gated deploy + mark every 10 min
+      env:           { LIVE_MODE: 'true' },
+      error_file:    'logs/vault-engine-err.log',
+      out_file:      'logs/vault-engine-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    },
+    {
+      name:          'fairline-mm',
+      script:        'npx',
+      args:          'tsx src/deepbook-mm.ts quote',
+      cwd:           __dirname,
+      interpreter:   'none',
+      autorestart:   false,            // one-shot job
+      cron_restart:  '*/10 * * * *',   // posture-gated DeepBook CLOB requote every 10 min
+      env:           {},
+      error_file:    'logs/mm-err.log',
+      out_file:      'logs/mm-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    },
+    {
       name:         'fairline-dashboard',
       script:       'npx',
       args:         'tsx src/dashboard.ts',
