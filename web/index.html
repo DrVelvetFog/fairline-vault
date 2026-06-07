@@ -205,13 +205,14 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
 
 <section id="features"><div class="wrap reveal">
   <div class="tag">Built like a real financial product</div>
-  <h2>Four things most vaults don't do.</h2>
+  <h2>Five things most vaults don't do.</h2>
   <p class="lead">FairLine isn't a yield aggregator — it's the <b style="color:var(--text)">house</b> of a prediction market, with the structure to match.</p>
   <div class="feats">
     <div class="feat"><div class="ic">🏦</div><h3>Senior / junior tranches</h3><p><b style="color:var(--green)">Senior</b> is principal-protected by junior's first-loss buffer and earns a capped, steady yield (≤8% APR). <b style="color:#e0a93c">Junior</b> absorbs losses first and takes the leveraged upside. Pick your risk.</p></div>
     <div class="feat"><div class="ic">⚖️</div><h3>Provably-fair pricing</h3><p>Every deposit and withdrawal prices at a <em>freshly-marked</em> NAV, recomputed independently from the on-chain PLP rate — so you never enter or exit at a stale, unfair share price.</p></div>
     <div class="feat"><div class="ic">📊</div><h3>Capacity-capped</h3><p>The house edge doesn't scale forever, so the vault <em>closes the door</em> when more capital would dilute everyone's yield — an on-chain cap, not a marketing promise.</p></div>
     <div class="feat"><div class="ic">🔁</div><h3>House flywheel</h3><p>FairLine routes a slice of its edge into rebates for predictors trading the markets it backs. More rebates → more volume → more edge → more rebates.</p></div>
+    <div class="feat"><div class="ic">📖</div><h3>Direct DeepBook orderbook</h3><p>The same risk gate runs a live maker on DeepBook's <b style="color:var(--text)">core CLOB</b> — resting real limit orders on the DEEP/SUI book, posture-gated and inventory-skewed. One risk brain, two venues: the prediction market and the orderbook.</p></div>
   </div>
 </div></section>
 
@@ -241,6 +242,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
     <a class="vlink" href="https://suiscan.xyz/testnet/tx/9wdQYzuvPQAy3eYf2WJXxq77xsv9AHkCTmbcMRH93gBu" target="_blank" rel="noopener"><span class="n">2</span><span><div class="t">Deposit — junior tranche</div><div class="d">dUSDC in → FLP-J minted at NAV (first-loss, leveraged)</div></span><span class="arr">↗</span></a>
     <a class="vlink" href="https://suiscan.xyz/testnet/tx/Gd3zGDBxiackZhdhLFRC2idTtpJQHhxKfHgBTt8gxYpd" target="_blank" rel="noopener"><span class="n">3</span><span><div class="t">Withdraw — funds aren't trapped</div><div class="d">Burn FLP-J → pro-rata dUSDC back from the junior tranche</div></span><span class="arr">↗</span></a>
     <a class="vlink" href="https://suiscan.xyz/testnet/tx/FjTaze5qYkY81q4zHKUBuFt9a2M8yGTi27YCesdnRWRo" target="_blank" rel="noopener"><span class="n">4</span><span><div class="t">Flywheel — rebates paid to 22 predictors</div><div class="d">House edge → rebate pool → pro-rata payouts by trading volume</div></span><span class="arr">↗</span></a>
+    <a class="vlink" href="https://suiscan.xyz/testnet/tx/8Wrs564ExgE6B344iiSfhTwp6cKNeu4vPtYVTNbtw5dH" target="_blank" rel="noopener"><span class="n">5</span><span><div class="t">DeepBook CLOB — a real limit order on the orderbook</div><div class="d">Posture-gated maker resting liquidity on the DEEP/SUI book</div></span><span class="arr">↗</span></a>
     <a class="vlink" href="https://suiscan.xyz/testnet/object/0x686d8d1609d259b751dca545f99d5e186fd3d7e7f59cdd3838e79ecdf457c7bd" target="_blank" rel="noopener"><span class="n">◆</span><span><div class="t">The Move contract</div><div class="d">Tranched vault + flywheel package — senior/junior, capacity cap, 6 unit tests</div></span><span class="arr">↗</span></a>
   </div>
 </div></section>
