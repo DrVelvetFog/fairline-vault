@@ -92,29 +92,6 @@ function saveHistory(entry: CycleLog) {
 
 // ── Execution ─────────────────────────────────────────────────────────────────
 
-/**
- * LP exposure factor in [0,1] — how much of the LP target to actually hold.
- *
- * LP's only real risk is a large directional move (the vault is the house, so it
- * loses when traders win big). So we gate exposure on directional risk:
- *   - calm vol            → full exposure
- *   - elevated vol        → reduced
- *   - extreme vol         → full pullback (exit liquidity from harm's way)
- * and we further trim when the ML model is highly convicted on a direction
- * (a strong predicted move = higher directional risk to the house).
- */
-export function computeLpExposureFactor(vol: number, ml: MLPrediction): number {
-  let base: number;
-  if (vol >= EXTREME_VOL_THRESHOLD)   base = 0.0;   // extreme — pull out entirely
-  else if (vol >= HIGH_VOL_THRESHOLD) base = 0.6;   // elevated — partial
-  else                                base = 1.0;   // calm — full
-
-  // ML conviction: |prob-0.5|×2 ∈ [0,1]; strong conviction trims up to 30%.
-  const conviction = Math.min(1, Math.abs(ml.prob_up - 0.5) * 2);
-  const mlAdjust   = 1 - 0.3 * conviction;
-  return base * mlAdjust;
-}
-
 /** Preview the exact mint cost of a binary position via devInspect (free, no gas). */
 async function previewMintCost(
   oracleId: string,
@@ -374,10 +351,9 @@ export async function runCycle(): Promise<void> {
   // Target is a share of TOTAL capital (liquid + already in PLP), so the position
   // converges to LP_TARGET_PCT of everything, not of the shrinking liquid balance.
   const totalCapital = totalH + currentPlp;
-  // Advance the smoothed/hysteretic gate (60s cadence) and use its floored factor.
+  // Advance the smoothed/hysteretic gate (60s cadence); trim by P(large move).
   const gate = updateGate(vol);
-  const conviction = Math.min(1, Math.abs(mlPrediction.prob_up - 0.5) * 2);
-  const lpFactor = exposureFactor(gate.regime, 1 - 0.3 * conviction);
+  const lpFactor = exposureFactor(gate.regime, 1 - 0.5 * mlPrediction.probLarge);
   const lpTarget = Math.min(totalCapital * LP_TARGET_PCT * lpFactor, MAX_PLP_DUSDC);
   const lpDelta  = lpTarget - currentPlp;
   console.log(`\n[LP engine] exposure factor ${lpFactor.toFixed(2)} → target ${lpTarget.toFixed(1)} dUSDC | current ${currentPlp.toFixed(1)} | delta ${lpDelta >= 0 ? '+' : ''}${lpDelta.toFixed(1)}`);

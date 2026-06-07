@@ -108,7 +108,7 @@ function buildUserPrompt(ctx: CycleContext): string {
   const atm = Math.round(f.spot_usd);
 
   const mlLine = ctx.ml_prediction
-    ? `\nML MODEL SIGNAL  : ${formatPrediction(ctx.ml_prediction)} — trust this signal, it has ${(ctx.ml_prediction.cv_accuracy * 100).toFixed(1)}% cross-validated accuracy`
+    ? `\nML RISK SIGNAL  : ${formatPrediction(ctx.ml_prediction)} — large-move forecast at CV AUC ${ctx.ml_prediction.cvAuc.toFixed(2)}`
     : '';
 
   return `MARKET STATE — ${new Date().toISOString()}${mlLine}

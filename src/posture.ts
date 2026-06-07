@@ -32,7 +32,7 @@ export interface Posture {
   vol:          number;   // realized vol % (annualized)
   lpFactor:     number;   // actual exposure factor in [0,1] (same as the trading loop)
   sleeveActive: boolean;  // is the directional sleeve armed this regime
-  mlDirection:  MLPrediction['direction'];
+  mlProbLarge:  number;   // P(large move) from the risk model
   mlConfidence: MLPrediction['confidence'];
   asOf:         string;   // ISO timestamp
 }
@@ -53,8 +53,8 @@ export function classifyPosture(vol: number, ml: MLPrediction): Posture {
   const gate = readGate(vol);
   const state = gate.regime;
   const v = gate.smoothedVol;
-  const conviction = Math.min(1, Math.abs(ml.prob_up - 0.5) * 2);
-  const mlAdjust = 1 - 0.3 * conviction;
+  // Trim exposure when a large move is likely (the event that hurts the house).
+  const mlAdjust = 1 - 0.5 * ml.probLarge;
   const lpFactor = exposureFactor(state, mlAdjust);
   const pct = Math.round(lpFactor * 100);
 
@@ -82,7 +82,7 @@ export function classifyPosture(vol: number, ml: MLPrediction): Posture {
     vol: v,
     lpFactor,
     sleeveActive: false,   // directional sleeve retired — the signal feeds the gate only
-    mlDirection:  ml.direction,
+    mlProbLarge:  ml.probLarge,
     mlConfidence: ml.confidence,
     asOf: new Date().toISOString(),
   };

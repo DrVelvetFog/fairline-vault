@@ -789,10 +789,11 @@ async function loadModelStats(){
     if(!d){document.getElementById('ml-stats').textContent='Stats not available — run npm run train';return;}
     const rows=[
       ['Model','Logistic Regression'],
+      ['Forecasts',d.objective==='large_move' ? 'P(move > '+d.threshold_pct+'%)' : 'settlement direction'],
       ['Trained on',d.trained_on.toLocaleString()+' oracles'],
-      ['CV Accuracy',(d.cv_accuracy*100).toFixed(1)+'%  (±'+(d.cv_std*100).toFixed(1)+'%)'],
-      ['Edge over random','+'+(d.edge_over_random_pp).toFixed(1)+'pp'],
-      ['Top feature',d.top_features?.[0] ? d.top_features[0][0]+' ('+d.top_features[0][1]+')' : '—'],
+      ['CV ROC-AUC',(d.cv_auc!=null?d.cv_auc.toFixed(3):'—')+'  (0.5 = random)'],
+      ['Large-move base rate',d.base_rate!=null ? (d.base_rate*100).toFixed(1)+'%' : '—'],
+      ['Top predictor',d.top_features?.[0] ? d.top_features[0][0]+' ('+d.top_features[0][1]+')' : '—'],
       ['Last retrained',d.trained_at?new Date(d.trained_at).toLocaleString():'—'],
     ];
     document.getElementById('ml-stats').innerHTML=rows.map(([k,v])=>
