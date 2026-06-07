@@ -1,41 +1,49 @@
-# FairLine — Demo Video Script (~4:45, target ≤5:00)
+# FairLine — System Demo Script (video 1 of 2: laptop / behind the scenes)
 
-Narration is written for AI TTS (~150 wpm). On-screen cues tell you what to show
-on the dashboard (`http://localhost:3002`) and Sui explorer. Honest framing
-throughout — testnet, unaudited.
+*Target ~2:45 (≤3:00). Narration written for AI TTS (~150 wpm). On-screen cues
+show the dashboard (`http://localhost:3002`), terminal, and Sui explorer. Honest
+framing throughout — testnet, unaudited.*
 
----
-
-### Scene 1 — Hook & problem (0:00–0:35)
-**ON SCREEN:** Dashboard top — FairLine logo, live BTC market, metrics bar.
-**NARRATION:**
-> "DeepBook Predict is a new on-chain market on Sui — Bitcoin options that settle every fifteen minutes. Like every options market, there are two sides: the traders who bet on direction, and the house that takes the other side and earns the spread. FairLine is built for the durable side of that trade — an autonomous, risk-managed liquidity vault that earns the house edge, with every decision verifiable on-chain."
-
-### Scene 2 — The honest pivot (0:35–1:20)
-**ON SCREEN:** Scroll to the "Directional Sleeve (Experimental)" card, then the LP card.
-**NARRATION:**
-> "We didn't start here. FairLine began as a machine-learning bot betting on direction. In backtest it looked great. Live on testnet, it lost money — a forty-one percent win rate against a fifty-one-and-a-half percent break-even. The two-percent spread was wider than the model's edge. So we asked: where did that money go? On-chain, the answer is exact — it went to the liquidity pool. The house. So we flipped sides — from the losing player to the house — and repurposed the model as a defensive risk signal instead of a betting engine."
-
-### Scene 3 — The LP engine (1:20–2:20)
-**ON SCREEN:** LP card — PLP position (~3,000 dUSDC), redemption rate, house edge +0.3%, exposure factor; then the Engine Activity table.
-**NARRATION:**
-> "Here's the live engine. FairLine supplies liquidity to the Predict pool and earns the spread — the redemption rate climbs as the house wins. The machine-learning and volatility signals don't place bets anymore; they gate exposure. When a big directional move is likely, FairLine scales its liquidity down. It's sticky by design — it sizes position by risk instead of churning in and out, because the pool's open liability is under a tenth of a percent of reserves."
-
-### Scene 4 — The multi-user vault (2:20–3:25)
-**ON SCREEN:** FairLine Vault card — TVL, share price, FLP supply. Then briefly the Sui explorer showing the deposit + withdraw tx digests.
-**NARRATION:**
-> "FairLine isn't just a bot — it's a product. We deployed our own Move contract: a multi-user vault. Anyone deposits dUSDC and receives FLP share tokens priced at net asset value. The vault deploys that capital into the pool to earn the house edge, and depositors can withdraw their pro-rata share at any time. This is live on testnet with two real depositors — a deposit, the capital flowing into the pool, and a withdrawal — all on-chain, all verifiable."
-
-### Scene 5 — Transparency (3:25–4:05)
-**ON SCREEN:** House Edge Accrual chart; the honest LP-vs-sleeve split; cycles log.
-**NARRATION:**
-> "Every cycle decision and every transaction is logged on-chain. The dashboard shows the house edge accruing over time, the vault's total value, and an honest split between the liquidity strategy and the small, capped experimental sleeve. We don't ask you to trust a number — you can verify all of it on Sui. And we're clear about what this is: testnet, unaudited, with a documented path to hardening."
-
-### Scene 6 — Vision & close (4:05–4:45)
-**ON SCREEN:** ROADMAP.md or the vault card; end on the FairLine logo.
-**NARRATION:**
-> "The roadmap is honest: on-chain net-asset-value, deploy caps, a third-party audit, and mainnet once DeepBook Predict ships there. The vault framework is strategy-agnostic — today it's risk-gated liquidity provision; tomorrow it can host others. FairLine turns a hard, losing game into a transparent, multi-user product on the winning side of the trade. Be the house — verifiably. Thanks for watching."
+> Companion: **DEMO_SCRIPT_APP.md** (the phone/Slush walkthrough). A single
+> stitched cut is in **DEMO_SCRIPT_FULL.md**.
 
 ---
 
-**Word count ≈ 520 (~3:30 of speech) — leaves ~1:15 for on-screen pauses and demo actions.**
+### Scene 1 — Hook & problem (0:00–0:25)
+**ON SCREEN:** Dashboard top — logo, live BTC market, the posture banner, the metrics bar.
+**NARRATION:**
+> "DeepBook Predict is a new on-chain market on Sui — Bitcoin options that settle every fifteen minutes. Like every options market, there are two sides: the traders who bet, and the house that takes the other side and earns the spread. FairLine lets anyone be the house — and it's a full structured product, live and verifiable on-chain."
+
+### Scene 2 — The honest pivot (0:25–0:55)
+**ON SCREEN:** Landing page "The pivot" section, or the directional-sleeve card.
+**NARRATION:**
+> "We didn't start here. FairLine began as a machine-learning bot betting on direction. Live on testnet, it lost money — a forty-one percent win rate against a fifty-one-and-a-half percent break-even. The two-percent spread was wider than the model's edge. So we asked where that money went. On-chain, the answer is exact — it went to the house. So we flipped sides, and turned the losing model into a defensive risk signal."
+
+### Scene 3 — One risk brain (0:55–1:15)
+**ON SCREEN:** Run `npx tsx src/posture.ts` → the 🟢/🟡/🔴 print; then the dashboard posture banner.
+**NARRATION:**
+> "At the core is one risk brain — an ML and volatility gate that reads the market as Green, Amber, or Red. Green: full exposure. Amber: pull back. Red: sit flat. This same signal governs every part of the system you're about to see."
+
+### Scene 4 — Tranches & capacity (1:15–1:40)
+**ON SCREEN:** Dashboard — the TRANCHED vault card (senior/junior) + the capacity meter.
+**NARRATION:**
+> "The vault is tranched. Senior is principal-protected and earns a steady, capped yield. Junior takes the first loss but the leveraged upside — you pick your risk. And it's capacity-capped on-chain: when more deposits would dilute the yield, the vault closes the door. The opposite of chasing TVL for its own sake."
+
+### Scene 5 — Fair pricing & the flywheel (1:40–2:05)
+**ON SCREEN:** Run `npx tsx src/fairness.ts` (fair vs on-chain price, drift), then `npx tsx src/rewards.ts status` (pool, rebates, predictors).
+**NARRATION:**
+> "Every deposit and withdrawal prices at a freshly-marked, honest NAV — we show the live drift, so no one transacts at a stale price. And FairLine is two-sided: it routes a slice of its edge back to the predictors trading the markets it backs — real rebates, paid pro-rata to on-chain volume. We've already paid twenty-two traders."
+
+### Scene 6 — Direct DeepBook orderbook (2:05–2:30)
+**ON SCREEN:** Run `npx tsx src/deepbook-mm.ts quote` → the maker reading posture + mid, then placing/cancelling real limit orders; cut to Suiscan showing a resting order on the DEEP/SUI book.
+**NARRATION:**
+> "And the same risk brain runs a market maker directly on DeepBook's core orderbook — resting real limit orders on the DEEP-SUI book, gated by the exact same posture. One brain, two venues: the prediction market and the orderbook. This is live, on-chain liquidity on DeepBook itself."
+
+### Scene 7 — Transparency, verify & close (2:30–2:45)
+**ON SCREEN:** Suiscan — the tranched vault object and the DeepBook order tx; end on the FairLine logo.
+**NARRATION:**
+> "None of this is a mockup — open the vault and the orders on Sui yourself. Tranches, fair pricing, a capacity cap, a predictor flywheel, a risk gate, and a live DeepBook maker. It's GLP for prediction markets — but structured, honest, and verifiable. FairLine. Be the house."
+
+---
+
+**Narration ≈ 420 words (~2:50 of speech, including demo pauses). Trim Scene 2 first if you need to tighten.**
