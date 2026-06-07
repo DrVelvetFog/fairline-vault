@@ -602,7 +602,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
     <div class="card">
       <h2>ML Risk Gate</h2>
-      <div class="note" style="border:none;padding:0 0 10px;margin:0">A directional model used <strong style="color:var(--text)">defensively</strong> — it scales LP exposure down when a strong move is likely, not to place bets.</div>
+      <div class="note" style="border:none;padding:0 0 10px;margin:0">A <strong style="color:var(--text)">large-move forecast</strong> (P of a damaging settlement move) — it scales LP exposure down when a big move is likely, not to place bets.</div>
       <div id="ml-stats">Loading…</div>
     </div>
 
