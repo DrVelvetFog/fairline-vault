@@ -24,6 +24,7 @@ logs/demo-wallet.json
 logs/sim-wallets.json
 demo/
 logs/vault-strategy.json
+logs/deepbook-bm.json
 contracts/**/Published.toml
 
 # Local backups — never commit

@@ -23,6 +23,7 @@ import { getLivePosture, Posture } from './posture.js';
 import { getFairness, ensureFreshMark } from './fairness.js';
 import { getRewardPool, getPredictorVolumes } from './rewards.js';
 import { REBATE_EDGE_PCT } from './config.js';
+import { readMid, readBmSui, readBmDeep, readOpenOrderCount, loadBM, POOL_NAME } from './deepbook.js';
 
 const PORT         = parseInt(process.env.DASHBOARD_PORT ?? '3002', 10);
 const CYCLES_LOG   = path.join(ROOT, 'logs/cycles.jsonl');
@@ -194,6 +195,24 @@ app.get('/api/flywheel', async (_req: Request, res: Response) => {
     const [pool, vols] = await Promise.all([getRewardPool(), getPredictorVolumes()]);
     const data = { ...pool, edgePct: REBATE_EDGE_PCT * 100, predictors: vols.length, topVolume: vols.slice(0, 5) };
     flywheelCache = { data, ts: Date.now() };
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// DeepBook CLOB maker — live mid, posture-driven state, inventory, open orders.
+let deepbookCache: { data: any; ts: number } | null = null;
+app.get('/api/deepbook', async (_req: Request, res: Response) => {
+  try {
+    if (deepbookCache && Date.now() - deepbookCache.ts < 20_000) { res.json(deepbookCache.data); return; }
+    const op = getAddress();
+    const bm = loadBM();
+    const [mid, posture] = await Promise.all([readMid(op).catch(() => null), getLivePosture().catch(() => null)]);
+    let sui = 0, deep = 0, orders = 0;
+    if (bm) [sui, deep, orders] = await Promise.all([readBmSui(bm, op), readBmDeep(bm, op), readOpenOrderCount(bm, op)]);
+    const state = posture?.state ?? null;
+    const behavior = state === 'RED' ? 'cancel-all · flat' : state === 'AMBER' ? 'wide spread · half size' : state === 'GREEN' ? 'tight spread · full size' : '—';
+    const data = { pool: POOL_NAME, mid, posture: state, behavior, bm, sui, deep, openOrders: orders };
+    deepbookCache = { data, ts: Date.now() };
     res.json(data);
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
@@ -572,6 +591,16 @@ button:disabled{opacity:.5;cursor:not-allowed}
     </div>
 
     <div class="card">
+      <h2>📖 DeepBook CLOB Maker <span class="tag tag-primary">ORDERBOOK</span></h2>
+      <div class="note" style="border:none;padding:0 0 10px;margin:0">The same risk gate runs a live maker on DeepBook's core orderbook — <strong style="color:var(--text)">one brain, two venues</strong>. Bids are SUI-funded; asks turn on as inventory builds.</div>
+      <div class="row"><span class="k">Pool</span><span class="v" id="db-pool">—</span></div>
+      <div class="row"><span class="k">Mid price</span><span class="v" id="db-mid">—</span></div>
+      <div class="row"><span class="k">Posture → behavior</span><span class="v" id="db-posture">—</span></div>
+      <div class="row"><span class="k">Resting orders on book</span><span class="v" id="db-orders" style="color:var(--green)">—</span></div>
+      <div class="row"><span class="k">Maker inventory</span><span class="v" id="db-inv">—</span></div>
+    </div>
+
+    <div class="card">
       <h2>ML Risk Gate</h2>
       <div class="note" style="border:none;padding:0 0 10px;margin:0">A directional model used <strong style="color:var(--text)">defensively</strong> — it scales LP exposure down when a strong move is likely, not to place bets.</div>
       <div id="ml-stats">Loading…</div>
@@ -934,9 +963,22 @@ async function loadFlywheel(){
   }catch(e){}
 }
 
+async function loadDeepbook(){
+  try{
+    const d=await api('/api/deepbook');
+    document.getElementById('db-pool').textContent=d.pool;
+    document.getElementById('db-mid').textContent=d.mid?d.mid.toFixed(8)+' SUI/DEEP':'—';
+    const pe=document.getElementById('db-posture');
+    pe.textContent=(d.posture||'—')+' · '+d.behavior;
+    pe.style.color={GREEN:'var(--green)',AMBER:'var(--amber)',RED:'var(--red)'}[d.posture]||'var(--muted)';
+    document.getElementById('db-orders').textContent=d.openOrders+' on book';
+    document.getElementById('db-inv').textContent=d.sui.toFixed(3)+' SUI · '+d.deep.toFixed(2)+' DEEP';
+  }catch(e){}
+}
+
 async function loadAll(){
   document.getElementById('hd-time').textContent=new Date().toLocaleTimeString();
-  await Promise.allSettled([loadPosture(),loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp(),loadVaultState(),loadFairness(),loadFlywheel(),loadAccrual()]);
+  await Promise.allSettled([loadPosture(),loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp(),loadVaultState(),loadFairness(),loadFlywheel(),loadDeepbook(),loadAccrual()]);
   renderCapital();
 }
 
