@@ -58,6 +58,8 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
 .walletbtn{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--surf2);cursor:pointer;font-weight:600;font-size:14px}
 .walletbtn:hover{border-color:var(--green)}
 .walletbtn img{width:24px;height:24px;border-radius:6px}
+.trbtn{flex:1;cursor:pointer;opacity:.5}
+.trbtn.active{opacity:1;border-color:var(--green);color:var(--green)}
 </style>
 </head>
 <body>
@@ -73,12 +75,20 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
   </nav>
 
   <h1>Vault App <span class="tag">TESTNET</span></h1>
-  <p class="sub">Deposit dUSDC into the FairLine vault, receive FLP shares priced at NAV, and withdraw your pro-rata claim — all on-chain.</p>
+  <p class="sub">Deposit dUSDC into the FairLine vault's <b>senior</b> (protected) or <b>junior</b> (first-loss, leveraged) tranche, receive FLP-S / FLP-J shares priced at NAV, and withdraw your pro-rata claim — all on-chain.</p>
 
   <!-- live vault stats (always shown, read-only from chain) -->
   <div class="grid">
     <div class="stat"><div class="v" id="s-tvl">—</div><div class="l">Vault TVL (dUSDC)</div></div>
-    <div class="stat"><div class="v" id="s-price">—</div><div class="l">FLP share price (NAV)</div></div>
+    <div class="stat"><div class="v" id="s-cap">—</div><div class="l">Capacity used</div></div>
+  </div>
+
+  <!-- tranches (read-only) -->
+  <div class="card">
+    <h2>🏦 Tranches</h2>
+    <div class="row"><span class="k"><b style="color:var(--green)">Senior</b> · protected · ≤8% APR</span><span class="v"><span id="s-sen">—</span> · <span id="s-sen-px" class="mono">—</span></span></div>
+    <div class="row"><span class="k"><b style="color:#e0a93c">Junior</b> · first-loss · leveraged</span><span class="v"><span id="s-jun">—</span> · <span id="s-jun-px" class="mono">—</span></span></div>
+    <div class="row"><span class="k">Senior coverage</span><span class="v" id="s-cov">—</span></div>
   </div>
 
   <!-- vault & market conditions (read-only, no wallet needed) -->
@@ -108,31 +118,36 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
       <h2>📈 Your Position <span class="addr" id="acct" style="margin-left:auto">—</span></h2>
       <div style="font-size:12px;color:var(--muted)">Accrued P&amp;L</div>
       <div class="pnl-big" id="pos-pnl">—</div>
-      <div class="row"><span class="k">FLP shares held</span><span class="v" id="bal-flp">—</span></div>
+      <div class="row"><span class="k">FLP-S (senior) held</span><span class="v" id="bal-flp-s">—</span></div>
+      <div class="row"><span class="k">FLP-J (junior) held</span><span class="v" id="bal-flp-j">—</span></div>
       <div class="row"><span class="k">Position value (at NAV)</span><span class="v" id="pos-val">—</span></div>
       <div class="row"><span class="k">Net deposited</span><span class="v" id="pos-net">—</span></div>
-      <div class="row"><span class="k">Avg entry → now (share price)</span><span class="v" id="pos-entry">—</span></div>
+      <div class="row"><span class="k">Share price (S · J)</span><span class="v" id="pos-entry">—</span></div>
       <div class="row"><span class="k">Wallet dUSDC</span><span class="v" id="bal-dusdc">—</span></div>
     </div>
 
     <div class="card">
       <h2>💧 Deposit</h2>
-      <label>Amount of dUSDC to deposit</label>
+      <label>Tranche</label>
+      <div class="inputrow" style="gap:8px"><button class="maxbtn trbtn active" id="dep-s" type="button">Senior (protected)</button><button class="maxbtn trbtn" id="dep-j" type="button">Junior (leveraged)</button></div>
+      <label style="margin-top:12px">Amount of dUSDC to deposit</label>
       <div class="inputrow"><input id="depAmt" type="number" min="0" step="0.000001" placeholder="0.00"><button class="maxbtn" id="depMax">MAX</button></div>
-      <button class="btn btn-primary" id="depBtn" style="margin-top:14px;width:100%;justify-content:center">Deposit → mint FLP shares</button>
+      <button class="btn btn-primary" id="depBtn" style="margin-top:14px;width:100%;justify-content:center">Deposit → mint shares</button>
       <div class="status" id="depStatus"></div>
     </div>
 
     <div class="card">
       <h2>🏦 Withdraw</h2>
-      <label>FLP shares to redeem</label>
+      <label>Tranche</label>
+      <div class="inputrow" style="gap:8px"><button class="maxbtn trbtn active" id="w-s" type="button">Senior (FLP-S)</button><button class="maxbtn trbtn" id="w-j" type="button">Junior (FLP-J)</button></div>
+      <label style="margin-top:12px">Shares to redeem</label>
       <div class="inputrow"><input id="wAmt" type="number" min="0" step="0.000001" placeholder="0.00"><button class="maxbtn" id="wMax">MAX</button></div>
-      <button class="btn btn-primary" id="wBtn" style="margin-top:14px;width:100%;justify-content:center">Withdraw → burn FLP for dUSDC</button>
+      <button class="btn btn-primary" id="wBtn" style="margin-top:14px;width:100%;justify-content:center">Withdraw → burn shares for dUSDC</button>
       <div class="status" id="wStatus"></div>
     </div>
   </div>
 
-  <p class="note">FairLine Vault on Sui testnet · <a href="https://suiscan.xyz/testnet/object/0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e" target="_blank" rel="noopener">view contract ↗</a> · <a href="/">back to site</a><br>Need testnet dUSDC? Request it via the DeepBook Predict docs. Unaudited — testnet only.</p>
+  <p class="note">Tranched FairLine Vault on Sui testnet · <a href="https://suiscan.xyz/testnet/object/0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e" target="_blank" rel="noopener">view contract ↗</a> · <a href="/">back to site</a><br>Need testnet dUSDC? Request it via the DeepBook Predict docs. Unaudited — testnet only.</p>
 </div>
 
 <script type="module">
@@ -141,23 +156,28 @@ import { Transaction } from 'https://esm.sh/@mysten/sui@1.18.0/transactions';
 import { getWallets } from 'https://esm.sh/@mysten/wallet-standard@0.13.0';
 
 const RPC='https://fullnode.testnet.sui.io:443';
-const PKG='0xfe5abfde639a8ea1a208808578f1c7f79f4aa94cf15a77f169cdc8f3d8c0ccfb';
-const VAULT='0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e';
+// PKG = upgraded package id (function calls) · PKG_TYPES = original publish id (FLP-S/J + event types)
+const PKG='0x686d8d1609d259b751dca545f99d5e186fd3d7e7f59cdd3838e79ecdf457c7bd';
+const PKG_TYPES='0x8c5c7e1205468970100265c17a8c9a80fe43d67bfed0230cb807f1f75e7029e4';
+const VAULT='0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e';
 const PREDICT='0xc8736204d12f0a7277c86388a68bf8a194b0a14c5538ad13f22cbd8e2a38028a';
 const DUSDC='0xe95040085976bfd54a1a07225cd46c8a2b4e8e2b6732f140a0fc49850ba73e1a::dusdc::DUSDC';
-const FLP=PKG+'::vault::VAULT';
+const FLP_S=PKG_TYPES+'::flp_s::FLP_S';
+const FLP_J=PKG_TYPES+'::flp_j::FLP_J';
+const CAP=3000;            // on-chain VAULT_CAPACITY (dUSDC)
 const SCALE=1e6;
 const client=new SuiClient({url:RPC});
-let wallet=null, account=null, sharePrice=1;
+let wallet=null, account=null, seniorPrice=1, juniorPrice=1;
+let depTranche='senior', wTranche='senior';
 
 const $=id=>document.getElementById(id);
 const fmt=(n,d)=>Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 function status(el,kind,msg){el.className='status show '+kind;el.innerHTML=msg;}
 
 const PS='https://predict-server.testnet.mystenlabs.com';
-let reserve=0, deployed=0, flpBalance=0;
+let reserve=0, deployed=0, sFlp=0, jFlp=0;
 
-// ── vault stats + house edge + allocation (no wallet needed) ─────────────────
+// ── vault stats + tranches + house edge + allocation (no wallet needed) ──────
 async function loadStats(){
   try{
     const [v,p]=await Promise.all([
@@ -166,10 +186,20 @@ async function loadStats(){
     ]);
     const f=v.data.content.fields;
     reserve=Number(f.reserve)/SCALE; deployed=Number(f.deployed)/SCALE;
-    const shares=Number(f.treasury.fields.total_supply.fields.value)/SCALE;
-    const nav=reserve+deployed; sharePrice=shares>0?nav/shares:1;
+    const nav=reserve+deployed;
+    const seniorValue=Number(f.senior_value)/SCALE;
+    const juniorValue=Math.max(0,nav-seniorValue);
+    const sShares=Number(f.s_treasury.fields.total_supply.fields.value)/SCALE;
+    const jShares=Number(f.j_treasury.fields.total_supply.fields.value)/SCALE;
+    seniorPrice=sShares>0?seniorValue/sShares:1;
+    juniorPrice=jShares>0?juniorValue/jShares:1;
     $('s-tvl').textContent=fmt(nav,2);
-    $('s-price').textContent=fmt(sharePrice,6);
+    $('s-cap').textContent=fmt(nav/CAP*100,1)+'%';
+    $('s-sen').textContent=fmt(seniorValue,2)+' dUSDC';
+    $('s-sen-px').textContent=fmt(seniorPrice,4);
+    $('s-jun').textContent=fmt(juniorValue,2)+' dUSDC';
+    $('s-jun-px').textContent=fmt(juniorPrice,4);
+    $('s-cov').textContent=juniorValue>0?fmt(seniorValue/juniorValue,2)+'× senior:junior':'—';
     const pf=p.data.content.fields;
     const rate=Number(pf.vault.fields.balance)/Number(pf.treasury_cap.fields.total_supply.fields.value);
     const edge=(rate-1)*100;
@@ -222,17 +252,17 @@ async function loadPnl(){
   if(!account)return;
   try{
     const addr=account.address;
-    const [dep,wd]=await Promise.all([queryEvents(PKG+'::vault::Deposited'),queryEvents(PKG+'::vault::Withdrawn')]);
-    let depUsd=0,depShares=0,wdUsd=0;
-    dep.forEach(e=>{const j=e.parsedJson;if(j&&j.depositor===addr){depUsd+=Number(j.amount)/SCALE;depShares+=Number(j.shares)/SCALE;}});
+    const [dep,wd]=await Promise.all([queryEvents(PKG_TYPES+'::vault::Deposited'),queryEvents(PKG_TYPES+'::vault::Withdrawn')]);
+    let depUsd=0,wdUsd=0;
+    dep.forEach(e=>{const j=e.parsedJson;if(j&&j.depositor===addr){depUsd+=Number(j.amount)/SCALE;}});
     wd.forEach(e=>{const j=e.parsedJson;if(j&&j.withdrawer===addr){wdUsd+=Number(j.amount)/SCALE;}});
-    const value=flpBalance*sharePrice;
-    const pnl=(value+wdUsd)-depUsd, pct=depUsd>0?pnl/depUsd*100:0, entry=depShares>0?depUsd/depShares:1;
+    const value=sFlp*seniorPrice+jFlp*juniorPrice;
+    const pnl=(value+wdUsd)-depUsd, pct=depUsd>0?pnl/depUsd*100:0;
     const el=$('pos-pnl');
     el.textContent=(pnl>=0?'+':'')+fmt(pnl,4)+' dUSDC  ('+(pnl>=0?'+':'')+fmt(pct,2)+'%)';
     el.style.color=pnl>=0?'var(--green)':'var(--red)';
     $('pos-net').textContent=fmt(depUsd-wdUsd,4)+' dUSDC';
-    $('pos-entry').textContent=fmt(entry,6)+' → '+fmt(sharePrice,6);
+    $('pos-entry').textContent='S '+fmt(seniorPrice,4)+' · J '+fmt(juniorPrice,4);
   }catch(e){}
 }
 
@@ -240,15 +270,18 @@ async function loadPnl(){
 async function loadBalances(){
   if(!account) return;
   try{
-    const [d,p]=await Promise.all([
+    const [d,ps,pj]=await Promise.all([
       client.getBalance({owner:account.address,coinType:DUSDC}),
-      client.getBalance({owner:account.address,coinType:FLP}),
+      client.getBalance({owner:account.address,coinType:FLP_S}),
+      client.getBalance({owner:account.address,coinType:FLP_J}),
     ]);
-    const dusdc=Number(d.totalBalance)/SCALE; flpBalance=Number(p.totalBalance)/SCALE;
+    const dusdc=Number(d.totalBalance)/SCALE; sFlp=Number(ps.totalBalance)/SCALE; jFlp=Number(pj.totalBalance)/SCALE;
     $('bal-dusdc').textContent=fmt(dusdc,4)+' dUSDC';
-    $('bal-flp').textContent=fmt(flpBalance,4)+' FLP';
-    $('pos-val').textContent=fmt(flpBalance*sharePrice,4)+' dUSDC';
-    $('depMax').dataset.max=dusdc; $('wMax').dataset.max=flpBalance;
+    $('bal-flp-s').textContent=fmt(sFlp,4)+' FLP-S';
+    $('bal-flp-j').textContent=fmt(jFlp,4)+' FLP-J';
+    $('pos-val').textContent=fmt(sFlp*seniorPrice+jFlp*juniorPrice,4)+' dUSDC';
+    $('depMax').dataset.max=dusdc;
+    $('wMax').dataset.maxs=sFlp; $('wMax').dataset.maxj=jFlp;
     loadPnl();
   }catch(e){}
 }
@@ -305,6 +338,12 @@ async function execTx(tx){
 }
 const scan=d=>`<a href="https://suiscan.xyz/testnet/tx/${d}" target="_blank" rel="noopener">${d.slice(0,10)}… ↗</a>`;
 
+// ── tranche toggles ──────────────────────────────────────────────────────────
+function setDep(t){depTranche=t;$('dep-s').classList.toggle('active',t==='senior');$('dep-j').classList.toggle('active',t==='junior');}
+function setW(t){wTranche=t;$('w-s').classList.toggle('active',t==='senior');$('w-j').classList.toggle('active',t==='junior');}
+$('dep-s').onclick=()=>setDep('senior'); $('dep-j').onclick=()=>setDep('junior');
+$('w-s').onclick=()=>setW('senior'); $('w-j').onclick=()=>setW('junior');
+
 // ── deposit ──────────────────────────────────────────────────────────────────
 $('depMax').onclick=()=>{$('depAmt').value=$('depMax').dataset.max||'';};
 $('depBtn').onclick=async()=>{
@@ -320,16 +359,17 @@ $('depBtn').onclick=async()=>{
     const primary=tx.object(coins[0].coinObjectId);
     if(coins.length>1)tx.mergeCoins(primary,coins.slice(1).map(c=>tx.object(c.coinObjectId)));
     const [coin]=tx.splitCoins(primary,[tx.pure.u64(raw)]);
-    const shares=tx.moveCall({target:`${PKG}::vault::deposit`,typeArguments:[DUSDC],arguments:[tx.object(VAULT),coin]});
+    const fn=depTranche==='senior'?'deposit_senior':'deposit_junior';
+    const shares=tx.moveCall({target:`${PKG}::vault::${fn}`,typeArguments:[DUSDC],arguments:[tx.object(VAULT),coin]});
     tx.transferObjects([shares],account.address);
     const r=await execTx(tx);
-    status($('depStatus'),'ok','✓ Deposited '+amt+' dUSDC → FLP shares. Tx '+scan(r.digest));
+    status($('depStatus'),'ok','✓ Deposited '+amt+' dUSDC → '+depTranche+' ('+(depTranche==='senior'?'FLP-S':'FLP-J')+'). Tx '+scan(r.digest));
     setTimeout(()=>{loadStats();loadBalances();},2500);
   }catch(e){status($('depStatus'),'err','Failed: '+(e.message||e));}
 };
 
 // ── withdraw ─────────────────────────────────────────────────────────────────
-$('wMax').onclick=()=>{$('wAmt').value=$('wMax').dataset.max||'';};
+$('wMax').onclick=()=>{$('wAmt').value=(wTranche==='senior'?$('wMax').dataset.maxs:$('wMax').dataset.maxj)||'';};
 $('wBtn').onclick=async()=>{
   if(!account)return;
   const amt=parseFloat($('wAmt').value);
@@ -337,16 +377,18 @@ $('wBtn').onclick=async()=>{
   const raw=BigInt(Math.round(amt*SCALE));
   status($('wStatus'),'info','Building transaction… approve it in your wallet.');
   try{
-    const coins=(await client.getCoins({owner:account.address,coinType:FLP})).data;
-    if(!coins.length)return status($('wStatus'),'err','No FLP shares in wallet.');
+    const ftype=wTranche==='senior'?FLP_S:FLP_J, fname=wTranche==='senior'?'FLP-S':'FLP-J';
+    const coins=(await client.getCoins({owner:account.address,coinType:ftype})).data;
+    if(!coins.length)return status($('wStatus'),'err','No '+fname+' shares in wallet.');
     const tx=new Transaction();
     const primary=tx.object(coins[0].coinObjectId);
     if(coins.length>1)tx.mergeCoins(primary,coins.slice(1).map(c=>tx.object(c.coinObjectId)));
     const [exact]=tx.splitCoins(primary,[tx.pure.u64(raw)]);
-    const out=tx.moveCall({target:`${PKG}::vault::withdraw`,typeArguments:[DUSDC],arguments:[tx.object(VAULT),exact]});
+    const fn=wTranche==='senior'?'withdraw_senior':'withdraw_junior';
+    const out=tx.moveCall({target:`${PKG}::vault::${fn}`,typeArguments:[DUSDC],arguments:[tx.object(VAULT),exact]});
     tx.transferObjects([out],account.address);
     const r=await execTx(tx);
-    status($('wStatus'),'ok','✓ Withdrew '+amt+' FLP → dUSDC. Tx '+scan(r.digest));
+    status($('wStatus'),'ok','✓ Withdrew '+amt+' '+fname+' → dUSDC. Tx '+scan(r.digest));
     setTimeout(()=>{loadStats();loadBalances();},2500);
   }catch(e){status($('wStatus'),'err','Failed: '+(e.message||e));}
 };

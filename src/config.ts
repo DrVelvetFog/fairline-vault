@@ -24,11 +24,16 @@ export const PLP_TYPE = `${PREDICT_PACKAGE}::plp::PLP`;
 // VAULT_PACKAGE = original publish id — defines the FLP-S/FLP-J/Vault *types*.
 // VAULT_PACKAGE_LATEST = newest upgraded id — target for *function calls* (new code).
 export const VAULT_PACKAGE        = process.env.VAULT_PACKAGE        ?? '0x8c5c7e1205468970100265c17a8c9a80fe43d67bfed0230cb807f1f75e7029e4';
-export const VAULT_PACKAGE_LATEST = process.env.VAULT_PACKAGE_LATEST ?? '0x51be19ea72cff8d55fe848c1565d19eda93f31ab79cbed8d9801671006c57438';
+export const VAULT_PACKAGE_LATEST = process.env.VAULT_PACKAGE_LATEST ?? '0x686d8d1609d259b751dca545f99d5e186fd3d7e7f59cdd3838e79ecdf457c7bd';
 export const VAULT_OBJECT    = process.env.VAULT_OBJECT    ?? '0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e';
 export const VAULT_ADMIN_CAP = process.env.VAULT_ADMIN_CAP ?? '0xc0e47b0700b566ca4d02e974a3739a645d668a823ffbf8bc2c1c88bd755e2196';
 export const FLP_S_TYPE      = `${VAULT_PACKAGE}::flp_s::FLP_S`;   // senior share (original id)
 export const FLP_J_TYPE      = `${VAULT_PACKAGE}::flp_j::FLP_J`;   // junior share (original id)
+
+// ── House Flywheel — predictor rebate pool (rewards module) ───────────────────
+export const REWARD_POOL      = process.env.REWARD_POOL      ?? '0x18e4b06c83aa7a4f2fde24989bdbbc94c5ebbfc78d9416fb10eafad2f0b3e5ee';
+export const REWARD_ADMIN_CAP = process.env.REWARD_ADMIN_CAP ?? '0xf6463bb2461006999ca0ff1676727462a72f7c63bd3b1bdb709fb59a290ff5ce';
+export const REBATE_EDGE_PCT  = 0.20;   // share of realized house edge routed to predictor rebates
 
 // On-chain deposit capacity (mirror of VAULT_CAPACITY in vault.move) — the vault
 // refuses deposits past this so the house edge isn't diluted past what it absorbs.

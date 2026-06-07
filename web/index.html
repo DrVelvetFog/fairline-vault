@@ -142,7 +142,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
     <a class="btn btn-primary" href="/app">Launch app →</a>
     <a class="btn btn-ghost" id="hero-demo" href="#" target="_blank" rel="noopener">▶ Watch demo</a>
     <a class="btn btn-ghost" href="https://github.com/DrVelvetFog/fairline-vault" target="_blank" rel="noopener">GitHub</a>
-    <a class="btn btn-ghost" href="https://suiscan.xyz/testnet/object/0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e" target="_blank" rel="noopener">Verify on-chain ↗</a>
+    <a class="btn btn-ghost" href="https://suiscan.xyz/testnet/object/0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e" target="_blank" rel="noopener">Verify on-chain ↗</a>
   </div>
   <div class="pills">
     <div class="pill"><div class="v g" id="h-tvl">130.00</div><div class="l">Vault TVL (dUSDC)</div></div>
@@ -227,7 +227,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
     <a class="vlink" href="https://suiscan.xyz/testnet/tx/8mfSbAJdzd73YNh6x8XwgsbNYFF1eLP61gTyVp4v6PR8" target="_blank" rel="noopener"><span class="n">1</span><span><div class="t">Deposit — a real user, from the live app on mobile</div><div class="d">dUSDC in → FLP shares minted at NAV (via the dApp + Slush wallet)</div></span><span class="arr">↗</span></a>
     <a class="vlink" href="https://suiscan.xyz/testnet/tx/7J1oNLrk34Zp17s9FcPqVtERwuhTQY6TUYzHYzo5UdHq" target="_blank" rel="noopener"><span class="n">2</span><span><div class="t">Deploy — capital flows into the house</div><div class="d">Vault reserve → DeepBook Predict PLP, one atomic PTB</div></span><span class="arr">↗</span></a>
     <a class="vlink" href="https://suiscan.xyz/testnet/tx/djf8x61tuG5yiUrmxvxCikrCx68WGLwJf4fN8bZijvu" target="_blank" rel="noopener"><span class="n">3</span><span><div class="t">Withdraw — funds aren't trapped (same mobile user)</div><div class="d">Burn FLP → pro-rata dUSDC back, redeemed in the app</div></span><span class="arr">↗</span></a>
-    <a class="vlink" href="https://suiscan.xyz/testnet/object/0xfe5abfde639a8ea1a208808578f1c7f79f4aa94cf15a77f169cdc8f3d8c0ccfb" target="_blank" rel="noopener"><span class="n">◆</span><span><div class="t">The Move contract</div><div class="d">FairLine Vault package — NAV share vault with unit tests</div></span><span class="arr">↗</span></a>
+    <a class="vlink" href="https://suiscan.xyz/testnet/object/0x686d8d1609d259b751dca545f99d5e186fd3d7e7f59cdd3838e79ecdf457c7bd" target="_blank" rel="noopener"><span class="n">◆</span><span><div class="t">The Move contract</div><div class="d">FairLine Vault package — NAV share vault with unit tests</div></span><span class="arr">↗</span></a>
   </div>
 </div></section>
 
@@ -254,13 +254,13 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
 <footer><div class="wrap">
   <div class="logo"><svg class="logosvg" viewBox="0 0 120 120"><rect width="120" height="120" rx="28" fill="#10160e"/><path d="M52 60 L94 33" stroke="#36e07f" stroke-width="6.5" stroke-linecap="round"/><circle cx="94" cy="33" r="5.5" fill="#36e07f"/><circle cx="52" cy="60" r="7.5" fill="#ece2d0"/><circle cx="52" cy="60" r="3.2" fill="#10160e"/></svg>Fair<span>Line</span></div>
   <div>Sui Overflow 2026 · DeepBook track · testnet · unaudited</div>
-  <div style="display:flex;gap:20px"><a href="/app">Launch app</a><a href="https://github.com/DrVelvetFog/fairline-vault" target="_blank" rel="noopener">GitHub</a><a id="foot-demo" href="#" target="_blank" rel="noopener">Demo</a><a href="https://suiscan.xyz/testnet/object/0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e" target="_blank" rel="noopener">On-chain</a></div>
+  <div style="display:flex;gap:20px"><a href="/app">Launch app</a><a href="https://github.com/DrVelvetFog/fairline-vault" target="_blank" rel="noopener">GitHub</a><a id="foot-demo" href="#" target="_blank" rel="noopener">Demo</a><a href="https://suiscan.xyz/testnet/object/0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e" target="_blank" rel="noopener">On-chain</a></div>
 </div></footer>
 
 <script>
 // ── config ───────────────────────────────────────────────────────────────────
 var RPC="https://fullnode.testnet.sui.io:443";
-var VAULT="0x71a3527114fb4bd65a612bb095ce5bc14e9a043530f22df7f6f8c240af04fb7e";
+var VAULT="0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e";
 var PREDICT="0xc8736204d12f0a7277c86388a68bf8a194b0a14c5538ad13f22cbd8e2a38028a";
 var YT="https://youtu.be/dJPlnTcuF5g"; // demo video
 ['hero-demo','foot-demo','cta-demo'].forEach(function(id){var e=document.getElementById(id);if(e)e.href=YT;});
@@ -283,7 +283,9 @@ function refresh(){
   Promise.all([getObj(VAULT),getObj(PREDICT)]).then(function(r){
     var v=r[0],p=r[1];
     var reserve=Number(v.reserve)/1e6, deployed=Number(v.deployed)/1e6;
-    var shares=Number(v.treasury.fields.total_supply.fields.value)/1e6;
+    var sShares=Number(v.s_treasury.fields.total_supply.fields.value)/1e6;
+    var jShares=Number(v.j_treasury.fields.total_supply.fields.value)/1e6;
+    var shares=sShares+jShares;
     var nav=reserve+deployed, price=shares>0?nav/shares:1;
     var pr=Number(p.vault.fields.balance)/Number(p.treasury_cap.fields.total_supply.fields.value);
     var edge=(pr-1)*100;

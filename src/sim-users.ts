@@ -35,10 +35,10 @@ const MIN_DEPOSIT          = 8;      // per-user floor
 const MAX_DEPOSIT          = 90;     // per-user ceiling
 const N_WITHDRAWERS        = 10;     // users who withdraw part of their FLP
 const WITHDRAW_FRAC        = 0.4;    // fraction of FLP they redeem
-const GAS_PER_USER_SUI     = 0.02;   // SUI funded to each user for gas (real deposit cost ~0.004)
+const GAS_PER_USER_SUI     = 0.015;  // SUI funded to each user for gas (deposit+withdraw ~0.01)
 const OPERATOR_GAS_BUFFER  = 0.15;   // SUI kept for operator's own txs (redeem + funding)
 const DUSDC_BUFFER         = 50;     // loose dUSDC kept spare after funding
-const FUND_CHUNK           = 25;     // users funded per PTB
+const FUND_CHUNK           = 10;     // users funded per PTB (smaller = safer gas)
 const WALLET_FILE          = 'logs/sim-wallets.json';
 const CLOCK                = '0x6';
 
@@ -91,7 +91,7 @@ function buildPartialPlpRedeem(plpCoinId: string, plpAmountRaw: bigint, sender: 
 
 async function signExec(tx: Transaction, kp: Ed25519Keypair): Promise<void> {
   tx.setSender(kp.toSuiAddress());
-  tx.setGasBudget(15_000_000);
+  tx.setGasBudget(8_000_000);   // fits within a user's remaining gas after deposit
   const r = await client.signAndExecuteTransaction({ transaction: tx, signer: kp, options: { showEffects: true } });
   await client.waitForTransaction({ digest: r.digest });
   if (r.effects?.status.status !== 'success') throw new Error(`tx failed: ${r.effects?.status.error}`);
@@ -174,7 +174,7 @@ async function main() {
     const dusdcOuts = tx.splitCoins(primary, amts.map(a => tx.pure.u64(humanToDusdc(a))));
     const suiOuts   = tx.splitCoins(tx.gas, slice.map(() => tx.pure.u64(Math.round(GAS_PER_USER_SUI * MIST))));
     slice.forEach((u, i) => tx.transferObjects([dusdcOuts[i], suiOuts[i]], u.toSuiAddress()));
-    const r = await execute(tx);
+    const r = await execute(tx, 200_000_000);
     console.log(`    ✓ funded ${start + 1}–${start + slice.length}  tx ${r.digest}`);
   }
 

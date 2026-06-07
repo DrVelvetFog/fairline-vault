@@ -25,10 +25,10 @@ export function getAddress(): string {
 export { client };
 
 /** Execute a transaction and wait for it to be indexed. */
-export async function execute(tx: Transaction): Promise<SuiTransactionBlockResponse> {
+export async function execute(tx: Transaction, gasBudget = 50_000_000): Promise<SuiTransactionBlockResponse> {
   const kp = getKeypair();
   tx.setSender(kp.toSuiAddress());
-  tx.setGasBudget(50_000_000);
+  tx.setGasBudget(gasBudget);
 
   const result = await client.signAndExecuteTransaction({
     transaction: tx,

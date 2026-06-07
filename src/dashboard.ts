@@ -21,6 +21,8 @@ import { MANAGER_ID, DUSDC_SCALE, priceToHuman, PREDICT_OBJECT } from './config.
 import { computeFeatures } from './features.js';
 import { getLivePosture, Posture } from './posture.js';
 import { getFairness, ensureFreshMark } from './fairness.js';
+import { getRewardPool, getPredictorVolumes } from './rewards.js';
+import { REBATE_EDGE_PCT } from './config.js';
 
 const PORT         = parseInt(process.env.DASHBOARD_PORT ?? '3002', 10);
 const CYCLES_LOG   = path.join(ROOT, 'logs/cycles.jsonl');
@@ -183,6 +185,19 @@ app.post('/api/fair-mark', async (_req: Request, res: Response) => {
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
+// House Flywheel — rebate pool + predictor volume landscape. Volume enumeration
+// hits many indexer endpoints, so cache 60s.
+let flywheelCache: { data: any; ts: number } | null = null;
+app.get('/api/flywheel', async (_req: Request, res: Response) => {
+  try {
+    if (flywheelCache && Date.now() - flywheelCache.ts < 60_000) { res.json(flywheelCache.data); return; }
+    const [pool, vols] = await Promise.all([getRewardPool(), getPredictorVolumes()]);
+    const data = { ...pool, edgePct: REBATE_EDGE_PCT * 100, predictors: vols.length, topVolume: vols.slice(0, 5) };
+    flywheelCache = { data, ts: Date.now() };
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
 app.get('/api/accrual', (_req: Request, res: Response) => {
   try {
     const lines = fs.readFileSync(path.join(ROOT, 'logs/accrual.jsonl'), 'utf-8').trim().split('\n').filter(Boolean);
@@ -287,6 +302,9 @@ header{background:rgba(13,18,25,.85);backdrop-filter:blur(10px);border-bottom:1p
 .trrow.tr-s{background:linear-gradient(90deg,rgba(63,215,122,.06),transparent)}
 .trrow.tr-j{background:linear-gradient(90deg,rgba(224,169,60,.07),transparent)}
 .tr-s b{color:var(--green)} .tr-j b{color:var(--amber)}
+
+/* Flywheel loop pill */
+.flyloop{display:inline-block;margin-top:7px;font-family:var(--mono);font-size:10px;color:var(--green);background:rgba(63,215,122,.08);padding:2px 8px;border-radius:6px;border:1px solid rgba(63,215,122,.2)}
 
 /* Capacity meter */
 .caphead{display:flex;justify-content:space-between;align-items:baseline;margin:12px 0 5px}
@@ -542,6 +560,15 @@ button:disabled{opacity:.5;cursor:not-allowed}
       <div class="row"><span class="k">Live NAV vs recorded</span><span class="v" id="fair-nav">—</span></div>
       <button class="btn-secondary" id="fair-btn" style="margin-top:12px;width:100%" onclick="fairMark()">⚖️ Mark to fair NAV</button>
       <div class="note mono" id="fair-msg" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <h2>🔁 House Flywheel <span class="tag tag-primary">REBATES</span></h2>
+      <div class="note" style="border:none;padding:0 0 10px;margin:0">The house shares <strong style="color:var(--text)" id="fw-edgepct">—</strong> of its edge as rebates to predictors trading the markets it backs. More rebates → more volume → more edge. <span class="flyloop">edge → rebates → volume → edge</span></div>
+      <div class="bigstat"><span class="num" id="fw-pool" style="font-size:24px">—</span><span class="unit">dUSDC in rebate pool</span></div>
+      <div class="row"><span class="k">Lifetime rebated</span><span class="v" id="fw-rebated" style="color:var(--green)">—</span></div>
+      <div class="row"><span class="k">Rebate payouts</span><span class="v" id="fw-count">—</span></div>
+      <div class="row"><span class="k">Predictors earning</span><span class="v" id="fw-predictors">—</span></div>
     </div>
 
     <div class="card">
@@ -896,9 +923,20 @@ async function fairMark(){
   btn.disabled=false; btn.textContent='⚖️ Mark to fair NAV';
 }
 
+async function loadFlywheel(){
+  try{
+    const d=await api('/api/flywheel');
+    document.getElementById('fw-edgepct').textContent=d.edgePct.toFixed(0)+'%';
+    document.getElementById('fw-pool').textContent=d.balance.toFixed(2);
+    document.getElementById('fw-rebated').textContent=d.lifetimeRebated.toFixed(2)+' dUSDC';
+    document.getElementById('fw-count').textContent=d.rebateCount+' payouts';
+    document.getElementById('fw-predictors').textContent=d.predictors+' active';
+  }catch(e){}
+}
+
 async function loadAll(){
   document.getElementById('hd-time').textContent=new Date().toLocaleTimeString();
-  await Promise.allSettled([loadPosture(),loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp(),loadVaultState(),loadFairness(),loadAccrual()]);
+  await Promise.allSettled([loadPosture(),loadMarket(),loadVault(),loadCycles(),loadModelStats(),loadLiveResults(),loadPlp(),loadVaultState(),loadFairness(),loadFlywheel(),loadAccrual()]);
   renderCapital();
 }
 
