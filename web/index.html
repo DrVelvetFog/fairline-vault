@@ -128,6 +128,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
   <div class="navlinks">
     <a class="hidesm" href="#pivot">The pivot</a>
     <a class="hidesm" href="#how">How it works</a>
+    <a class="hidesm" href="#features">Features</a>
     <a class="hidesm" href="#live">Live</a>
     <a class="hidesm" href="#verify">Verify</a>
     <a class="btn btn-primary" href="/app">Launch app →</a>
@@ -137,7 +138,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
 <header class="hero"><div class="wrap">
   <div class="eyebrow"><span class="dot"></span> Sui Overflow 2026 · <b>DeepBook track</b></div>
   <h1>Be the house.<br><span class="grad">Verifiably.</span></h1>
-  <p class="sub">FairLine is a risk-managed, multi-user liquidity vault for DeepBook Predict on Sui. It earns the market's structural <b style="color:var(--text)">house edge</b> — and proves every number on-chain.</p>
+  <p class="sub">FairLine is a risk-managed, <b style="color:var(--text)">tranched</b> liquidity vault for DeepBook Predict on Sui. Be the house — pick your risk (protected <b style="color:var(--text)">senior</b> or leveraged <b style="color:var(--text)">junior</b>), earn the structural <b style="color:var(--text)">house edge</b>, and verify every number on-chain.</p>
   <div class="cta">
     <a class="btn btn-primary" href="/app">Launch app →</a>
     <a class="btn btn-ghost" id="hero-demo" href="#" target="_blank" rel="noopener">▶ Watch demo</a>
@@ -147,7 +148,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
   <div class="pills">
     <div class="pill"><div class="v g" id="h-tvl">130.00</div><div class="l">Vault TVL (dUSDC)</div></div>
     <div class="pill"><div class="v g" id="h-edge">+0.32%</div><div class="l">House edge to date</div></div>
-    <div class="pill"><div class="v" id="h-price">1.0000</div><div class="l">FLP share price</div></div>
+    <div class="pill"><div class="v" id="h-cap">—</div><div class="l">Capacity used</div></div>
   </div>
 </div></header>
 
@@ -174,7 +175,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
   <h2>Yield from being the house — without the work.</h2>
   <p class="lead">Prediction markets need liquidity, and the pool that provides it earns the spread every losing trader pays. But providing it well takes automation, risk management, and capital discipline most people don't have. FairLine packages that into one deposit.</p>
   <div class="feats">
-    <div class="feat"><div class="ic">👤</div><h3>For depositors</h3><p>Want prediction-market yield without running a bot, holding keys, or sizing risk? Deposit dUSDC, hold FLP, withdraw anytime. The vault is the house — and now so are you.</p></div>
+    <div class="feat"><div class="ic">👤</div><h3>For depositors</h3><p>Want prediction-market yield without running a bot? Deposit dUSDC into the <b style="color:var(--text)">senior</b> tranche for protected, steady yield — or <b style="color:var(--text)">junior</b> for leveraged upside. Withdraw anytime. The vault is the house, and now so are you.</p></div>
     <div class="feat"><div class="ic">📈</div><h3>A durable edge</h3><p>The house edge is structural, not a bet — the 2% spread is paid by traders on both sides. It compounds into the FLP share price over time, on-chain and measurable.</p></div>
     <div class="feat"><div class="ic">🛡️</div><h3>Risk most LPs get wrong</h3><p>An LP's real danger is a big directional move. FairLine's ML/volatility gate scales exposure down exactly then — turning a model that can't profit <em>betting</em> into one that's valuable <em>defending</em>.</p></div>
   </div>
@@ -186,8 +187,8 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
   <p class="lead">No leverage, no emissions farming — just the structural edge a prediction market pays its liquidity pool.</p>
   <div class="feats">
     <div class="feat"><div class="ic">①</div><h3>Traders pay the spread</h3><p>Every BTC option on DeepBook Predict carries a ~2% spread, and traders lose to the house on average. Both accrue to the liquidity pool's reserves.</p></div>
-    <div class="feat"><div class="ic">②</div><h3>You hold the house</h3><p>Deposit dUSDC and FairLine supplies it to that pool. You receive FLP shares, priced at the vault's net asset value.</p></div>
-    <div class="feat"><div class="ic">③</div><h3>Your shares appreciate</h3><p>As the edge accrues, the pool's redemption rate climbs — so your FLP grows in value. Withdraw any time for more dUSDC than you put in.</p></div>
+    <div class="feat"><div class="ic">②</div><h3>You hold the house</h3><p>Deposit dUSDC and FairLine supplies it to that pool. You receive FLP-S (senior) or FLP-J (junior) shares, priced at the vault's net asset value.</p></div>
+    <div class="feat"><div class="ic">③</div><h3>Your shares appreciate</h3><p>As the edge accrues, the pool's redemption rate climbs — so your shares grow in value (junior leveraged, senior capped + protected). Withdraw any time.</p></div>
   </div>
   <p class="note" style="text-align:center;border:none;max-width:720px;margin-left:auto;margin-right:auto">The house wins <em>on average</em>, not every cycle — a large directional move can dip the share price, which is exactly what the ML/volatility gate guards against. Steady, modest yield — not a moonshot.</p>
 </div></section>
@@ -197,24 +198,36 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
   <h2>Three parts, one transparent system.</h2>
   <div class="feats">
     <div class="feat"><div class="ic">💧</div><h3>LP-primary engine</h3><p>Supplies ~70% of capital to DeepBook Predict's pool to earn the structural house edge. Sticky by design — it sizes position by risk rather than churning in and out.</p></div>
-    <div class="feat"><div class="ic">🧠</div><h3>ML risk gate</h3><p>A trained directional model (5-fold CV) used <em>defensively</em>: when a large move is likely, FairLine scales liquidity down. The losing alpha model becomes a useful risk model.</p></div>
-    <div class="feat"><div class="ic">🏦</div><h3>Multi-user vault</h3><p>Our own Move contract: deposit dUSDC, receive FLP shares priced at NAV, withdraw pro-rata. Real depositors, real TVL — anyone can join the house.</p></div>
+    <div class="feat"><div class="ic">🧠</div><h3>Risk-state gate</h3><p>A trained model (5-fold CV) used <em>defensively</em>: a live <b style="color:var(--text)">Green / Amber / Red</b> posture scales liquidity down when a large move is likely. The losing alpha model becomes a useful risk model.</p></div>
+    <div class="feat"><div class="ic">🏦</div><h3>Tranched vault</h3><p>Our own Move contract: deposit dUSDC into the <b style="color:var(--text)">senior</b> or <b style="color:var(--text)">junior</b> tranche, receive FLP-S / FLP-J priced at NAV, withdraw pro-rata. Real depositors, real TVL.</p></div>
+  </div>
+</div></section>
+
+<section id="features"><div class="wrap reveal">
+  <div class="tag">Built like a real financial product</div>
+  <h2>Four things most vaults don't do.</h2>
+  <p class="lead">FairLine isn't a yield aggregator — it's the <b style="color:var(--text)">house</b> of a prediction market, with the structure to match.</p>
+  <div class="feats">
+    <div class="feat"><div class="ic">🏦</div><h3>Senior / junior tranches</h3><p><b style="color:var(--green)">Senior</b> is principal-protected by junior's first-loss buffer and earns a capped, steady yield (≤8% APR). <b style="color:#e0a93c">Junior</b> absorbs losses first and takes the leveraged upside. Pick your risk.</p></div>
+    <div class="feat"><div class="ic">⚖️</div><h3>Provably-fair pricing</h3><p>Every deposit and withdrawal prices at a <em>freshly-marked</em> NAV, recomputed independently from the on-chain PLP rate — so you never enter or exit at a stale, unfair share price.</p></div>
+    <div class="feat"><div class="ic">📊</div><h3>Capacity-capped</h3><p>The house edge doesn't scale forever, so the vault <em>closes the door</em> when more capital would dilute everyone's yield — an on-chain cap, not a marketing promise.</p></div>
+    <div class="feat"><div class="ic">🔁</div><h3>House flywheel</h3><p>FairLine routes a slice of its edge into rebates for predictors trading the markets it backs. More rebates → more volume → more edge → more rebates.</p></div>
   </div>
 </div></section>
 
 <section id="live" class="live"><div class="wrap reveal">
   <div class="tag">Live on-chain · Sui testnet</div>
   <h2>Not a mockup. Read live from the chain.</h2>
-  <p class="lead">These numbers are fetched in your browser directly from Sui's public RPC, right now — refreshing every 15 seconds. The FLP share price is the vault's NAV <b style="color:var(--text)">derived from the on-chain PLP redemption rate</b> — verifiable, not operator-set.</p>
+  <p class="lead">These numbers are fetched in your browser directly from Sui's public RPC, right now — refreshing every 15 seconds. NAV is <b style="color:var(--text)">derived from the on-chain PLP redemption rate</b>, not operator-set, and split across the senior and junior tranches.</p>
   <div class="lgrid">
     <div class="lstat"><div class="v g" id="l-tvl">—</div><div class="l">Vault TVL (dUSDC)</div></div>
-    <div class="lstat"><div class="v" id="l-shares">—</div><div class="l">FLP shares outstanding</div></div>
-    <div class="lstat"><div class="v" id="l-price">—</div><div class="l">Share price (NAV)</div></div>
+    <div class="lstat"><div class="v" id="l-senior">—</div><div class="l">Senior tranche (FLP-S)</div></div>
+    <div class="lstat"><div class="v" id="l-junior">—</div><div class="l">Junior tranche (FLP-J)</div></div>
+    <div class="lstat"><div class="v" id="l-cap">—</div><div class="l">Capacity used</div></div>
     <div class="lstat"><div class="v g" id="l-edge">—</div><div class="l">House edge (PLP rate)</div></div>
-    <div class="lstat"><div class="v" id="l-reserve">—</div><div class="l">Idle reserve</div></div>
     <div class="lstat"><div class="v" id="l-deployed">—</div><div class="l">Deployed to strategy</div></div>
     <div class="lstat"><div class="v" id="l-poolrate">—</div><div class="l">PLP redemption rate</div></div>
-    <div class="lstat"><div class="v" id="l-reserves">—</div><div class="l">Pool reserves (dUSDC)</div></div>
+    <div class="lstat"><div class="v g" id="l-pool">—</div><div class="l">Rebate pool · flywheel</div></div>
   </div>
   <div class="livenote"><span class="dot"></span> <span id="l-status">connecting to fullnode.testnet.sui.io …</span></div>
 </div></section>
@@ -224,10 +237,11 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
   <h2>The whole lifecycle, on-chain.</h2>
   <p class="lead">Don't trust — verify. Every step is a real transaction you can open on the explorer.</p>
   <div class="vrow">
-    <a class="vlink" href="https://suiscan.xyz/testnet/tx/8mfSbAJdzd73YNh6x8XwgsbNYFF1eLP61gTyVp4v6PR8" target="_blank" rel="noopener"><span class="n">1</span><span><div class="t">Deposit — a real user, from the live app on mobile</div><div class="d">dUSDC in → FLP shares minted at NAV (via the dApp + Slush wallet)</div></span><span class="arr">↗</span></a>
-    <a class="vlink" href="https://suiscan.xyz/testnet/tx/7J1oNLrk34Zp17s9FcPqVtERwuhTQY6TUYzHYzo5UdHq" target="_blank" rel="noopener"><span class="n">2</span><span><div class="t">Deploy — capital flows into the house</div><div class="d">Vault reserve → DeepBook Predict PLP, one atomic PTB</div></span><span class="arr">↗</span></a>
-    <a class="vlink" href="https://suiscan.xyz/testnet/tx/djf8x61tuG5yiUrmxvxCikrCx68WGLwJf4fN8bZijvu" target="_blank" rel="noopener"><span class="n">3</span><span><div class="t">Withdraw — funds aren't trapped (same mobile user)</div><div class="d">Burn FLP → pro-rata dUSDC back, redeemed in the app</div></span><span class="arr">↗</span></a>
-    <a class="vlink" href="https://suiscan.xyz/testnet/object/0x686d8d1609d259b751dca545f99d5e186fd3d7e7f59cdd3838e79ecdf457c7bd" target="_blank" rel="noopener"><span class="n">◆</span><span><div class="t">The Move contract</div><div class="d">FairLine Vault package — NAV share vault with unit tests</div></span><span class="arr">↗</span></a>
+    <a class="vlink" href="https://suiscan.xyz/testnet/tx/2m2UvMWEUNk6PksXpz6vHdFAqjYT53hxXtmq4scoNynE" target="_blank" rel="noopener"><span class="n">1</span><span><div class="t">Deposit — senior tranche</div><div class="d">dUSDC in → FLP-S minted at NAV (protected, capped yield)</div></span><span class="arr">↗</span></a>
+    <a class="vlink" href="https://suiscan.xyz/testnet/tx/9wdQYzuvPQAy3eYf2WJXxq77xsv9AHkCTmbcMRH93gBu" target="_blank" rel="noopener"><span class="n">2</span><span><div class="t">Deposit — junior tranche</div><div class="d">dUSDC in → FLP-J minted at NAV (first-loss, leveraged)</div></span><span class="arr">↗</span></a>
+    <a class="vlink" href="https://suiscan.xyz/testnet/tx/Gd3zGDBxiackZhdhLFRC2idTtpJQHhxKfHgBTt8gxYpd" target="_blank" rel="noopener"><span class="n">3</span><span><div class="t">Withdraw — funds aren't trapped</div><div class="d">Burn FLP-J → pro-rata dUSDC back from the junior tranche</div></span><span class="arr">↗</span></a>
+    <a class="vlink" href="https://suiscan.xyz/testnet/tx/FjTaze5qYkY81q4zHKUBuFt9a2M8yGTi27YCesdnRWRo" target="_blank" rel="noopener"><span class="n">4</span><span><div class="t">Flywheel — rebates paid to 22 predictors</div><div class="d">House edge → rebate pool → pro-rata payouts by trading volume</div></span><span class="arr">↗</span></a>
+    <a class="vlink" href="https://suiscan.xyz/testnet/object/0x686d8d1609d259b751dca545f99d5e186fd3d7e7f59cdd3838e79ecdf457c7bd" target="_blank" rel="noopener"><span class="n">◆</span><span><div class="t">The Move contract</div><div class="d">Tranched vault + flywheel package — senior/junior, capacity cap, 6 unit tests</div></span><span class="arr">↗</span></a>
   </div>
 </div></section>
 
@@ -244,7 +258,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
 
 <section style="text-align:center;padding:100px 0;border-top:1px solid var(--border);background:radial-gradient(700px 300px at 50% 0%,rgba(54,224,127,.1),transparent 60%)"><div class="wrap reveal">
   <h2>Ready to be the house?</h2>
-  <p class="lead" style="margin:18px auto 32px">Deposit dUSDC, hold FLP shares, withdraw anytime — on Sui testnet, right in your browser or phone.</p>
+  <p class="lead" style="margin:18px auto 32px">Deposit dUSDC into the senior or junior tranche, hold FLP-S / FLP-J, withdraw anytime — on Sui testnet, right in your browser or phone.</p>
   <div class="cta" style="margin-top:0">
     <a class="btn btn-primary" href="/app" style="font-size:16px;padding:14px 28px">Launch the app →</a>
     <a class="btn btn-ghost" id="cta-demo" href="#" target="_blank" rel="noopener">▶ Watch demo</a>
@@ -262,6 +276,8 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
 var RPC="https://fullnode.testnet.sui.io:443";
 var VAULT="0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e";
 var PREDICT="0xc8736204d12f0a7277c86388a68bf8a194b0a14c5538ad13f22cbd8e2a38028a";
+var REWARD_POOL="0x18e4b06c83aa7a4f2fde24989bdbbc94c5ebbfc78d9416fb10eafad2f0b3e5ee";
+var CAP=3000; // on-chain VAULT_CAPACITY (dUSDC)
 var YT="https://youtu.be/dJPlnTcuF5g"; // demo video
 ['hero-demo','foot-demo','cta-demo'].forEach(function(id){var e=document.getElementById(id);if(e)e.href=YT;});
 
@@ -280,23 +296,25 @@ function fmt(n,d){return Number(n).toLocaleString('en-US',{minimumFractionDigits
 function set(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
 
 function refresh(){
-  Promise.all([getObj(VAULT),getObj(PREDICT)]).then(function(r){
-    var v=r[0],p=r[1];
+  Promise.all([getObj(VAULT),getObj(PREDICT),getObj(REWARD_POOL).catch(function(){return null;})]).then(function(r){
+    var v=r[0],p=r[1],rw=r[2];
     var reserve=Number(v.reserve)/1e6, deployed=Number(v.deployed)/1e6;
-    var sShares=Number(v.s_treasury.fields.total_supply.fields.value)/1e6;
-    var jShares=Number(v.j_treasury.fields.total_supply.fields.value)/1e6;
-    var shares=sShares+jShares;
-    var nav=reserve+deployed, price=shares>0?nav/shares:1;
+    var nav=reserve+deployed;
+    var seniorValue=Number(v.senior_value)/1e6;
+    var juniorValue=Math.max(0,nav-seniorValue);
     var pr=Number(p.vault.fields.balance)/Number(p.treasury_cap.fields.total_supply.fields.value);
     var edge=(pr-1)*100;
-    var poolRes=Number(p.vault.fields.balance)/1e6;
+    var capPct=nav/CAP*100;
     // hero
-    set('h-tvl',fmt(nav,2)); set('h-edge',(edge>=0?'+':'')+fmt(edge,2)+'%'); set('h-price',fmt(price,4));
+    set('h-tvl',fmt(nav,2)); set('h-edge',(edge>=0?'+':'')+fmt(edge,2)+'%'); set('h-cap',fmt(capPct,1)+'%');
     // live grid
-    set('l-tvl',fmt(nav,2)); set('l-shares',fmt(shares,2)+' FLP'); set('l-price',fmt(price,6)+' dUSDC');
-    set('l-edge',(edge>=0?'+':'')+fmt(edge,4)+'%'); set('l-reserve',fmt(reserve,2)+' dUSDC');
+    set('l-tvl',fmt(nav,2));
+    set('l-senior',fmt(seniorValue,2)+' dUSDC');
+    set('l-junior',fmt(juniorValue,2)+' dUSDC');
+    set('l-cap',fmt(capPct,1)+'% of '+fmt(CAP,0));
+    set('l-edge',(edge>=0?'+':'')+fmt(edge,4)+'%');
     set('l-deployed',fmt(deployed,2)+' dUSDC'); set('l-poolrate',fmt(pr,6));
-    set('l-reserves',fmt(poolRes/1e6,2)+'M');
+    set('l-pool',(rw&&rw.balance!==undefined)?fmt(Number(rw.balance)/1e6,2)+' dUSDC':'—');
     set('l-status','live · updated '+new Date().toLocaleTimeString());
   }).catch(function(e){ set('l-status','live fetch unavailable — values shown are last known'); });
 }
