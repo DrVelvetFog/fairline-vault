@@ -47,3 +47,11 @@ framing throughout — testnet, unaudited.*
 ---
 
 **Narration ≈ 420 words (~2:50 of speech, including demo pauses). Trim Scene 2 first if you need to tighten.**
+
+---
+
+### Live Q&A — keep these two loaded
+The questions most likely to come up after the video. Full scripts (60s + 15s versions, with delivery notes) live in **DEMO_SCRIPT_FULL.md → "Anticipated judge Q&A."**
+
+- **"Why not just use DeepBook's own market maker?"** → *"DeepBook's MM decides whether a market has quotes; FairLine decides whether a normal person gets to earn the spread those quotes capture, and at what risk tier. We're the structured-product layer over the house — and the tell is we **cap capacity and refuse deposits** when they'd dilute yield. A market maker never does that."*
+- **"Isn't operator-reported NAV a trust hole?"** → *"The only soft number is one value — the mark on deployed capital (`new_deployed`). Reserve is trustless, settlement can't claim more than was returned, every mark is timestamped on-chain. The mainnet fix derives it from the on-chain PLP rate; we sequenced it that way because Predict's testnet layout will change at mainnet."*

@@ -94,6 +94,15 @@ capacity-capped, with a predictor rebate flywheel, and a live DeepBook CLOB
 maker."** The individual ideas exist in DeFi; the combination, over this
 underlying, on Sui, does not exist anywhere else.
 
+**"Why not just use DeepBook's own market maker?"** Different layer, not a
+competitor. DeepBook's MM provides *liquidity* — quotes from minute one
+(infrastructure). FairLine is the structured-product layer above it: *who gets to
+be the house, and on what risk terms.* It turns house P&L into something a normal
+person can hold — a risk-tranched, capacity-gated, fair-priced share — without
+running a bot or taking uncapped downside. The tell that FairLine is a product,
+not a maker: it **caps capacity and refuses deposits** when they'd dilute yield. A
+market maker always wants more capital; FairLine optimizes the depositor's return.
+
 ## Meaningful DeepBook integration (the track, directly)
 
 - **Predict liquidity** — atomic PTBs for `supply`, withdraw→supply straight from
@@ -125,8 +134,12 @@ and stamp `marked_at` so freshness is provable on-chain.
 | **Live DeepBook CLOB limit order** | [`8Wrs564E…`](https://suiscan.xyz/testnet/tx/8Wrs564ExgE6B344iiSfhTwp6cKNeu4vPtYVTNbtw5dH) |
 
 Plus a 52-depositor simulation across both tranches, taking the vault to a real
-multi-user TVL. NAV is derived from the on-chain PLP redemption rate — verifiable
-by anyone, not operator-set.
+multi-user TVL. NAV's deployed-mark is *computed* from the on-chain PLP redemption
+rate — so anyone can recompute it — though today it's submitted by the operator
+(`new_deployed`) rather than read on-chain by the contract. That last step is the
+one documented trust assumption; it's bounded (`settle` can't claim more than was
+returned) and timestamped on-chain (`marked_at`), and the mainnet path reads the
+rate on-chain to remove the operator entirely.
 
 ## Transparency as a product
 

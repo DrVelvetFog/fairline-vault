@@ -98,3 +98,31 @@ Two footage sources, stitched in edit:
 
 ## If the posture is 🔴 RED while filming
 That's a *feature*, not a problem — in Scene 6 the maker will cancel all orders and sit flat. Narrate: *"Right now the gate is Red — markets are volatile — so the maker pulls all its orders off the book automatically. That's the risk brain protecting capital in real time."* (You can still show the pre-placed resting order on Suiscan in Scene 7.)
+
+---
+
+## Anticipated judge Q&A (have these ready)
+
+These are the two questions most likely to decide whether a judge files FairLine as a *product* or a *wrapper*. Answer the first on the right terms and you win the room; name the second before they find it and you bank trust for everything else.
+
+### Q1 · "Why not just use DeepBook's own market maker?"
+*(DeepBook is shipping an internal MM so new Predict markets quote from minute one — expect this question.)*
+
+**Full answer (~50–60s):**
+> "Fair question — and the answer is that we're not competing with DeepBook's market maker, we're built on top of it. DeepBook's MM solves a *liquidity* problem: it makes sure a new Predict market has quotes from minute one. That's infrastructure. FairLine solves a different problem one layer up — *who gets to be the house, and on what risk terms.*
+>
+> Being the house in a prediction market earns the spread. But today that's only available to people who can run a bot and stomach uncapped downside. FairLine turns that house P&L into something a normal person can hold: you deposit, and you own a risk-tranched slice of the edge. Senior is principal-protected by a junior first-loss buffer; junior takes more risk for more yield. The waterfall that splits profit and loss between them is enforced on-chain.
+>
+> And here's the tell that we're a product, not a market maker: **we cap capacity and refuse deposits when more capital would dilute depositor yield.** A market maker always wants more capital. We sometimes turn it away — because we optimize the depositor's return, not our AUM. DeepBook's MM gives a market liquidity. FairLine gives a person a managed, risk-tranched share of the house."
+
+**15-second version (if rushed):**
+> "DeepBook's market maker decides whether a market has quotes. FairLine decides whether *you* — someone who can't run a bot — get to earn the spread those quotes capture, and at what risk tier. We're not a market maker; we're the structured-product layer that turns house P&L into a retail-ownable, risk-tranched asset. The proof: we cap capacity and refuse deposits when they'd dilute yield. A market maker never does that."
+
+> **Delivery:** pause before the capacity-cap line and land it hard — it's the one claim a judge can't refute, and it flips the burden onto them to argue a market maker would ever refuse capital.
+
+### Q2 · "Your NAV is operator-reported — isn't that a trust hole?"
+
+**Full answer (~45–55s):**
+> "One honest limitation, and we want to name it before you find it. A depositor's value is net asset value — reserve plus deployed capital. The reserve is real on-chain balance, fully trustless. The one soft number is the *mark* on capital that's currently deployed into the strategy: today the operator reports it. It's not unbounded trust — settlement can't claim back more than was actually returned to the vault, and every mark is timestamped on-chain, so anyone can verify how fresh it is. The mainnet fix is to derive that mark directly from DeepBook Predict's on-chain PLP redemption rate instead of an operator. We've deliberately *not* done that yet, because Predict's package layout is pinned to a testnet branch and will change at mainnet — wiring our NAV tightly to it now would just guarantee a rewrite. So it's sequenced: ship decoupled on testnet, pull NAV on-chain once mainnet Predict is frozen."
+
+> **Why this wins:** the trust surface is literally *one `u64`* (`new_deployed` on `mark`/`settle`) — saying that precisely is far stronger than "operator-reported NAV," and the "before you find it" framing makes judges trust the rest of your claims more. The vault contract itself imports no Predict code (strategy-agnostic, Predict plugged in off-chain), so it survives a mainnet Predict re-deploy untouched — say that if pushed on mainnet risk.

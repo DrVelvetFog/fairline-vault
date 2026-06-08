@@ -19,7 +19,7 @@ FairLine is a **tranched, risk-managed liquidity vault** for [DeepBook Predict](
 **What it is.** Prediction markets need someone to take the other side of every trade — *the house*. That role earns a structural edge (the spread + average trader losses) but normally only sophisticated desks can play it. FairLine packages it into a one-click vault: deposit dUSDC, receive a share token priced at the vault's live NAV, withdraw any time. An ML/volatility model acts as a **defensive risk gate** — a live **🟢 Green / 🟡 Amber / 🔴 Red** posture that pulls exposure back exactly when a big move would hurt the house.
 
 **Why you'd use it**
-- **Real, structural yield** — the spread losing traders pay, compounding into your share price; NAV is derived from the on-chain redemption rate, *not operator-set*.
+- **Real, structural yield** — the spread losing traders pay, compounding into your share price; NAV is computed from the on-chain PLP redemption rate (anyone can recompute it), with one bounded, timestamped operator mark today and a mainnet path that reads it on-chain.
 - **You choose your risk** — **Senior (FLP-S)**: principal-protected by junior's buffer, steady ≤8% APR. **Junior (FLP-J)**: first-loss but takes the leveraged upside.
 - **Honest by design** — provably-fair entry/exit pricing (freshly-marked NAV), an on-chain **capacity cap** that closes the door before deposits dilute yield, and a **rebate flywheel** that shares edge with traders to grow volume. Testnet, unaudited — and it says so.
 
@@ -36,6 +36,8 @@ FairLine is a **tranched, risk-managed liquidity vault** for [DeepBook Predict](
 | Direct DeepBook orderbook | — | — | — | ✅ live CLOB maker |
 
 The individual ideas exist in DeFi; **the combination — over a prediction-market house, on Sui, with a live DeepBook CLOB maker — doesn't exist anywhere else.**
+
+**"Why not just use DeepBook's own market maker?"** Because it solves a different problem. DeepBook's MM provides *liquidity* — it makes sure a market has quotes from minute one (infrastructure). FairLine is the structured-product layer one step up: *who gets to be the house, and on what risk terms.* It turns house P&L into something a normal person can hold — a risk-tranched, capacity-gated, fair-NAV-priced share — without running a bot or stomaching uncapped downside. The tell that FairLine is a product, not a market maker: it **caps capacity and refuses deposits** when they'd dilute depositor yield. A market maker always wants more capital; FairLine optimizes the depositor's return, not its AUM.
 
 ### The six features
 
@@ -91,7 +93,7 @@ mark / settle       report/realize deployed value → runs the senior/junior wat
 
 Verified live on testnet: senior deposit ([`2m2UvMWE…`](https://suiscan.xyz/testnet/tx/2m2UvMWEUNk6PksXpz6vHdFAqjYT53hxXtmq4scoNynE)) · junior deposit ([`9wdQYzuv…`](https://suiscan.xyz/testnet/tx/9wdQYzuvPQAy3eYf2WJXxq77xsv9AHkCTmbcMRH93gBu)) · junior withdraw ([`Gd3zGDBx…`](https://suiscan.xyz/testnet/tx/Gd3zGDBxiackZhdhLFRC2idTtpJQHhxKfHgBTt8gxYpd)) · flywheel rebates to 22 predictors ([`FjTaze5q…`](https://suiscan.xyz/testnet/tx/FjTaze5qYkY81q4zHKUBuFt9a2M8yGTi27YCesdnRWRo)) · live DeepBook CLOB order ([`8Wrs564E…`](https://suiscan.xyz/testnet/tx/8Wrs564ExgE6B344iiSfhTwp6cKNeu4vPtYVTNbtw5dH)). NAV = idle reserve + deployed value (verifiable from the on-chain PLP rate).
 
-> **Security & status:** testnet, single-operator, **unaudited** (we never claim otherwise). The contract passed an internal security review; the main limitation is operator trust around NAV reporting. See [`ROADMAP.md`](./ROADMAP.md) for the hardening + mainnet path. DeepBook Predict is testnet-only today, so mainnet is upstream-blocked.
+> **Security & status:** testnet, single-operator, **unaudited** (we never claim otherwise). The contract passed an internal security review. The entire trust surface is *one value* — the operator's mark on deployed capital (`new_deployed` on `mark`/`settle`): the reserve is trustless, `settle` can't claim back more than was actually returned (`EDeployTooLarge`), and every mark is timestamped on-chain (`marked_at`) so freshness is provable. The mainnet fix derives that mark directly from the on-chain PLP redemption rate, removing the operator from the loop — sequenced *after* mainnet because Predict's object layout is pinned to a testnet branch and will change at launch. The vault itself imports no Predict code (strategy-agnostic; Predict is plugged in off-chain), so it survives a mainnet Predict re-deploy untouched. See [`ROADMAP.md`](./ROADMAP.md) for the hardening + mainnet path. DeepBook Predict is testnet-only today, so mainnet is upstream-blocked.
 
 ## Stack
 

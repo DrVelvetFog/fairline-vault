@@ -248,12 +248,23 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
 </div></section>
 
 <section><div class="wrap reveal">
+  <div class="tag">Positioning</div>
+  <h2>Why not just use DeepBook's own market maker?</h2>
+  <p class="lead">DeepBook's MM makes sure a market has <em>quotes</em>. FairLine decides whether <em>you</em> get to own the house behind them — and at what risk. Different layer, not a competitor.</p>
+  <div class="honest">
+    <div class="hbox"><h4>A layer up, not head-to-head</h4><p>DeepBook's market maker solves liquidity — quotes from minute one. That's infrastructure. FairLine is the structured-product layer on top: who gets to be the house, and on what risk terms.</p></div>
+    <div class="hbox"><h4>The tell: we refuse capital</h4><p>A market maker always wants more capital. FairLine <em>caps capacity and turns deposits away</em> when they'd dilute yield — because we optimize the depositor's return, not our AUM. That's a product, not a maker.</p></div>
+    <div class="hbox"><h4>What you actually own</h4><p>Not liquidity — a risk-tranched slice of house P&L. Senior is protected by junior's first-loss buffer; junior takes the leveraged upside. The waterfall is enforced on-chain.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap reveal">
   <div class="tag">Honest by design</div>
   <h2>What this is — and isn't.</h2>
   <p class="lead">Credibility is a feature. We never overclaim.</p>
   <div class="honest">
     <div class="hbox"><h4>Testnet</h4><p>Live on Sui testnet. DeepBook Predict isn't on mainnet yet, so neither are we — it's on the roadmap, not faked.</p></div>
-    <div class="hbox"><h4>Unaudited</h4><p>The contract passed an internal security review; the main limitation (operator-reported NAV) is documented. No "audited" claims.</p></div>
+    <div class="hbox"><h4>Unaudited</h4><p>The contract passed an internal security review. The whole trust surface is <em>one number</em> — the operator's mark on deployed capital. Reserve is trustless, settlement can't claim more than was returned, every mark is timestamped on-chain. Mainnet fix: derive it from the on-chain PLP rate. No "audited" claims.</p></div>
     <div class="hbox"><h4>Verifiable</h4><p>Every decision and transaction is on-chain. The numbers on this page come straight from the chain — check them yourself.</p></div>
   </div>
 </div></section>
