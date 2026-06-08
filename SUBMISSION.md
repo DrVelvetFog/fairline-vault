@@ -7,7 +7,7 @@
 > DeepBook's core orderbook. One ML/volatility risk brain governs both venues.
 > Every decision and every transaction is on-chain and verifiable.
 
-🌐 **[fairline-vault.netlify.app](https://fairline-vault.netlify.app)** · 🎬 **[Demo](https://youtu.be/dJPlnTcuF5g)** · 🔎 **[Vault on-chain](https://suiscan.xyz/testnet/object/0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e)**
+🌐 **[fairline-vault.netlify.app](https://fairline-vault.netlify.app)** · 🎬 **[Demo](https://youtu.be/ASc9A0AcXi8)** · 🔎 **[Vault on-chain](https://suiscan.xyz/testnet/object/0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e)**
 
 ---
 
