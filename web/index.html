@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FairLine — Be the house, verifiably · DeepBook Predict vault on Sui</title>
-<meta name="description" content="FairLine is a risk-managed, multi-user liquidity vault for DeepBook Predict on Sui. It earns the market's structural house edge — and proves every number on-chain.">
+<meta name="description" content="Deposit dUSDC and own a risk-tranched slice of the prediction-market house. FairLine is a tranched liquidity vault for DeepBook Predict on Sui — senior (protected) or junior (leveraged), every number verifiable on-chain. A product, not a dashboard.">
 <meta property="og:title" content="FairLine — Be the house, verifiably">
 <meta property="og:description" content="Risk-managed liquidity vault for DeepBook Predict on Sui. Live, on-chain, verifiable.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -146,9 +146,9 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
     <a class="btn btn-ghost" href="https://suiscan.xyz/testnet/object/0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e" target="_blank" rel="noopener">Verify on-chain ↗</a>
   </div>
   <div class="pills">
-    <div class="pill"><div class="v g" id="h-tvl">130.00</div><div class="l">Vault TVL (dUSDC)</div></div>
-    <div class="pill"><div class="v g" id="h-edge">+0.32%</div><div class="l">House edge to date</div></div>
-    <div class="pill"><div class="v" id="h-cap">—</div><div class="l">Capacity used</div></div>
+    <div class="pill"><div class="v g" id="h-tvl">2,323.61</div><div class="l">Vault TVL (dUSDC)</div></div>
+    <div class="pill"><div class="v g" id="h-edge">+0.35%</div><div class="l">House edge to date</div></div>
+    <div class="pill"><div class="v" id="h-cap">77.5%</div><div class="l">Capacity used</div></div>
   </div>
 </div></header>
 
@@ -164,7 +164,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
     </div>
     <div class="pcard good">
       <div class="h">After · be the house</div>
-      <div class="big">+0.32%</div>
+      <div class="big">+0.35%</div>
       <p>LP-primary: supply liquidity, earn the spread the losers pay. The ML/volatility signal now gates exposure against risk instead of gambling with it.</p>
     </div>
   </div>
@@ -210,7 +210,7 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
   <div class="feats">
     <div class="feat"><div class="ic">🏦</div><h3>Senior / junior tranches</h3><p><b style="color:var(--green)">Senior</b> is principal-protected by junior's first-loss buffer and earns a capped, steady yield (≤8% APR). <b style="color:#e0a93c">Junior</b> absorbs losses first and takes the leveraged upside. Pick your risk.</p></div>
     <div class="feat"><div class="ic">⚖️</div><h3>Provably-fair pricing</h3><p>Every deposit and withdrawal prices at a <em>freshly-marked</em> NAV, recomputed independently from the on-chain PLP rate — so you never enter or exit at a stale, unfair share price.</p></div>
-    <div class="feat"><div class="ic">📊</div><h3>Capacity-capped</h3><p>The house edge doesn't scale forever, so the vault <em>closes the door</em> when more capital would dilute everyone's yield — an on-chain cap, not a marketing promise.</p></div>
+    <div class="feat"><div class="ic">📊</div><h3>Capacity-capped</h3><p>The house edge doesn't scale forever, so the vault <em>closes the door</em> when more capital would dilute everyone's yield. We optimize <b style="color:var(--text)">depositor yield, not AUM</b> — an on-chain cap, not a marketing promise. (A market maker always wants more capital; FairLine sometimes refuses it.)</p></div>
     <div class="feat"><div class="ic">🔁</div><h3>House flywheel</h3><p>FairLine routes a slice of its edge into rebates for predictors trading the markets it backs. More rebates → more volume → more edge → more rebates.</p></div>
     <div class="feat"><div class="ic">📖</div><h3>Direct DeepBook orderbook</h3><p>The same risk gate runs a live maker on DeepBook's <b style="color:var(--text)">core CLOB</b> — resting real limit orders on the DEEP/SUI book, posture-gated and inventory-skewed. One risk brain, two venues: the prediction market and the orderbook.</p></div>
   </div>
