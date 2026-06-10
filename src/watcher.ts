@@ -13,9 +13,8 @@
 import 'dotenv/config';
 import { runCycle } from './cycle.js';
 import { getSettledOracles, getManagerPositions, getManagerSummary } from './indexer.js';
-import { buildRedeemPermissionless, buildWithdrawLiquidity } from './transactions.js';
-import { execute, getAddress } from './wallet.js';
-import { getDusdcCoins, getPlpCoins } from './coins.js';
+import { buildRedeemPermissionless } from './transactions.js';
+import { execute } from './wallet.js';
 import { MANAGER_ID, DUSDC_SCALE } from './config.js';
 import * as child_process from 'child_process';
 import * as fs from 'fs';
@@ -24,7 +23,6 @@ const POLL_INTERVAL_MS      = 60_000;  // 1 minute
 const RETRAIN_EVERY_N       = 20;      // retrain after this many new settled oracles (~5 hrs)
 const RETRAIN_MIN_HOURS     = 4;       // but never retrain more often than every 4 hours
 const RETRAIN_STATE_FILE    = 'logs/retrain-state.json';
-const MIN_WALLET_DUSDC      = 1_000;   // pull PLP back if wallet dUSDC drops below this
 
 // ── Retrain trigger ───────────────────────────────────────────────────────────
 
@@ -98,41 +96,6 @@ async function autoRedeem(): Promise<number> {
   return redeemed;
 }
 
-// ── Auto-withdraw PLP when wallet dUSDC is low ────────────────────────────────
-
-async function autoPLPWithdraw(): Promise<void> {
-  const address = getAddress();
-
-  // Check wallet dUSDC — if we have plenty, nothing to do
-  const dusdcBal = await getDusdcCoins(address);
-  if (dusdcBal.totalHuman >= MIN_WALLET_DUSDC) return;
-
-  // Check for PLP coins
-  const plpCoins = await getPlpCoins(address);
-  if (plpCoins.length === 0) return;
-
-  const totalPlp = plpCoins.reduce((s, c) => s + Number(c.balance), 0) / 1e6;
-  console.log(`  [plp-withdraw] Wallet dUSDC low (${dusdcBal.totalHuman.toFixed(2)}) — withdrawing ${totalPlp.toFixed(4)} PLP → dUSDC`);
-
-  let withdrawn = 0;
-  for (const plp of plpCoins) {
-    try {
-      const tx     = buildWithdrawLiquidity(plp.coinObjectId, address);
-      const result = await execute(tx);
-      const plpAmt = (Number(plp.balance) / 1e6).toFixed(4);
-      console.log(`  [plp-withdraw] ✓ ${plpAmt} PLP redeemed → ${result.digest}`);
-      withdrawn++;
-    } catch (e) {
-      console.error(`  [plp-withdraw] ❌ ${String(e).slice(0, 120)}`);
-    }
-  }
-
-  if (withdrawn > 0) {
-    const newBal = await getDusdcCoins(address);
-    console.log(`  [plp-withdraw] Wallet dUSDC now: ${newBal.totalHuman.toFixed(4)}`);
-  }
-}
-
 // ── Main tick ─────────────────────────────────────────────────────────────────
 
 async function tick() {
@@ -149,8 +112,11 @@ async function tick() {
       console.log(`  Balance: ${bal.toFixed(4)} dUSDC  |  Realized P&L: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} dUSDC`);
     }
 
-    // 2. Pull PLP back to dUSDC if wallet balance is running low
-    await autoPLPWithdraw();
+    // NOTE: the sleeve-era autoPLPWithdraw ("redeem ALL PLP when wallet cash is
+    // low") is retired with the sleeve. Under the dynamic gate it formed a
+    // churn loop with the LP engine (supply→below-min→redeem-all→supply…) and
+    // even redeemed the multi-user vault's deployed PLP backing. LP-only
+    // operation never needs to force wallet cash.
 
     // 3. Check if retrain is due
     const settled = await getSettledOracles();

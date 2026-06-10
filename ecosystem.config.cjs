@@ -50,7 +50,7 @@ module.exports = {
       cwd:           __dirname,
       interpreter:   'none',
       autorestart:   false,           // one-shot job (deadband-gated; usually no-op)
-      cron_restart:  '*/30 * * * *',  // re-mark vault NAV every 30 minutes
+      cron_restart:  '24,54 * * * *', // re-mark vault NAV every 30 min (offset vs engine/mm)
       env:           {},
       error_file:    'logs/mark-err.log',
       out_file:      'logs/mark-out.log',
@@ -63,7 +63,9 @@ module.exports = {
       cwd:           __dirname,
       interpreter:   'none',
       autorestart:   false,            // one-shot job
-      cron_restart:  '*/10 * * * *',   // posture-gated deploy + mark every 10 min
+      // Offset from fairline-mm: all operator txs share one gas coin, so
+      // same-minute crons race on it ("object locked" equivocation errors).
+      cron_restart:  '2,12,22,32,42,52 * * * *',   // posture-gated deploy + mark every 10 min
       env:           { LIVE_MODE: 'true' },
       error_file:    'logs/vault-engine-err.log',
       out_file:      'logs/vault-engine-out.log',
@@ -76,7 +78,7 @@ module.exports = {
       cwd:           __dirname,
       interpreter:   'none',
       autorestart:   false,            // one-shot job
-      cron_restart:  '*/10 * * * *',   // posture-gated DeepBook CLOB requote every 10 min
+      cron_restart:  '6,16,26,36,46,56 * * * *',   // CLOB requote every 10 min (offset vs vault-engine)
       env:           {},
       error_file:    'logs/mm-err.log',
       out_file:      'logs/mm-out.log',
