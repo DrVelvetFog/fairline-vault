@@ -83,6 +83,19 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },
     {
+      name:          'fairline-flywheel',
+      script:        'npx',
+      args:          'tsx src/rewards.ts daily 1',
+      cwd:           __dirname,
+      interpreter:   'none',
+      autorestart:   false,           // one-shot job
+      cron_restart:  '0 13 * * *',    // one flywheel turn daily (13:00 UTC)
+      env:           {},
+      error_file:    'logs/flywheel-err.log',
+      out_file:      'logs/flywheel-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    },
+    {
       name:         'fairline-dashboard',
       script:       'npx',
       args:         'tsx src/dashboard.ts',

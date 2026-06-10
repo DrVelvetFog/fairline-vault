@@ -52,13 +52,15 @@ The individual ideas exist in DeFi; **the combination — over a prediction-mark
 
 ## What it does
 
-Each 15-minute cycle, the autonomous watcher:
+Every 60 seconds, the autonomous watcher:
 
 1. **Reads** live BTC Predict market state from `predict-server.testnet.mystenlabs.com`.
-2. **Sizes LP exposure** — a target ~70% of capital in PLP, scaled by an ML/volatility risk gate (the house's only real risk is a large directional move).
-3. **Supplies liquidity** toward target on-chain via `predict::supply` (sourced atomically from the PredictManager balance).
-4. **Runs a small capped directional sleeve** — experimental ML-driven bets (≤15 dUSDC/position, ≤45/cycle), only in calm regimes with high model confidence. Its full P&L is reported honestly.
-5. **Shows** everything on a one-screen dashboard: live LP position, redemption-rate accrual, the LP risk gate, and an honest split between LP income and the experimental sleeve.
+2. **Advances the risk gate** — an EWMA-smoothed, hysteretic 🟢🟡🔴 volatility regime, trimmed by an ML *large-move* forecast (the house's only real risk is a large directional move).
+3. **Sizes LP exposure** — a target ~70% of capital in PLP, scaled by the gate's exposure factor; **sticky** (adds toward target, never force-exits).
+4. **Supplies liquidity** toward target on-chain via `predict::supply` (sourced atomically from the PredictManager balance), and a separate engine deploys the multi-user vault's reserve the same way.
+5. **Shows** everything on a one-screen dashboard: posture, tranches, fair-NAV drift, capacity, flywheel, and the DeepBook CLOB maker.
+
+> The original *directional* betting sleeve is **retired** (`SLEEVE_ENABLED=false`) — live results proved the spread structurally beats direction-taking, so the ML signal now feeds the defensive gate only. Its honest −749 dUSDC record is kept below as the pivot proof.
 
 ---
 
@@ -76,7 +78,7 @@ DeepBook Predict's vault is the counterparty (the house) to every binary-option 
 
 The open liability being ~0.09% of reserves is *why* FairLine uses **sticky liquidity** (it scales position size by risk rather than force-exiting) — a data-driven design choice, not an assumption.
 
-**The honest counterpoint:** FairLine began as a *directional* ML vault. Live on testnet it lost money (41.3% win rate vs ~51.5% break-even, −749 dUSDC) — the 2% spread is wider than a 63%-accurate directional model's edge. Those losses flowed into the PLP pool. So we re-weighted from the losing player to the winning house, and repurposed the ML model as a defensive risk gate. The directional strategy survives as a small, capped, transparent research sleeve.
+**The honest counterpoint:** FairLine began as a *directional* ML vault. Live on testnet it lost money (41.3% win rate vs ~51.5% break-even, −749 dUSDC) — the 2% spread is wider than a 63%-accurate directional model's edge. Those losses flowed into the PLP pool. So we re-weighted from the losing player to the winning house, and repurposed the ML model as a defensive risk gate. The directional sleeve has since been fully retired — the signal defends, it doesn't bet.
 
 ---
 
@@ -99,8 +101,7 @@ Verified live on testnet: senior deposit ([`2m2UvMWE…`](https://suiscan.xyz/te
 
 - **Sui SDK** `@mysten/sui` — PTB construction, transaction execution, devInspect previews
 - **DeepBook Predict** — PLP liquidity supply/withdraw, binary positions, ranges (testnet)
-- **ML risk gate** — logistic regression (12 features, 5-fold CV), retrained on settled oracles
-- **hermes3** (local Ollama) — sizing + natural-language reasoning for the directional sleeve
+- **ML risk gate** — logistic regression forecasting large moves (12 features, 5-fold CV, horizon-normalized label), retrained on settled oracles
 - **TypeScript** throughout; **Express** dashboard; **pm2** for autonomous operation
 
 ---
@@ -132,39 +133,44 @@ npm run lp-supply -- 200            # dry-run
 npm run lp-supply -- 200 --execute  # live
 ```
 
-**Autonomous operation** — `npm run watcher` (or via pm2) runs the LP engine + sleeve every 60s. Set `LIVE_MODE=true` in `.env` to execute on testnet (request dUSDC via the [Mysten Labs Tally form](https://docs.sui.io/onchain-finance/deepbook-predict/contract-information)).
+**Autonomous operation** — `npm run watcher` (or via pm2) runs the risk-gated LP engine every 60s. Set `LIVE_MODE=true` in `.env` to execute on testnet (request dUSDC via the [Mysten Labs Tally form](https://docs.sui.io/onchain-finance/deepbook-predict/contract-information)).
 
 **Representative live transactions (Sui testnet):**
 - LP supply: [`6RCL69MDBKb9YhFmcPDmPVNf3THrZf3XaxmVrKmDT4Xz`](https://suiexplorer.com/txblock/6RCL69MDBKb9YhFmcPDmPVNf3THrZf3XaxmVrKmDT4Xz?network=testnet)
 - LP supply: [`CznuJcDuA8dGL7p4FeizQTmBJdr5PjFWH2dircR8YiAw`](https://suiexplorer.com/txblock/CznuJcDuA8dGL7p4FeizQTmBJdr5PjFWH2dircR8YiAw?network=testnet)
-- Directional mint (sleeve): [`4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a`](https://suiexplorer.com/txblock/4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a?network=testnet)
+- Directional mint (retired sleeve, kept for the honest record): [`4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a`](https://suiexplorer.com/txblock/4MWHyy5eQr4zetWiJ1i9ExrVL7UEUCoqEBjcu333EC6a?network=testnet)
 
 ---
 
 ## How the LP risk gate works
 
 ```
-exposure factor  = base(vol) × ml_adjust(conviction)
-   base:   vol < 15%  → 1.0   (calm — full exposure)
-           15–30%     → 0.6   (elevated — partial)
-           ≥ 30%      → 0.0   (extreme — stop adding)
-   ml_adjust = 1 − 0.3 × |prob_up − 0.5|×2   (strong conviction trims up to 30%)
+regime (EWMA-smoothed vol + hysteresis — no chatter):
+   GREEN  vol < 30%   → base 1.0    (calm — full exposure)
+   AMBER  30–55%      → base 0.6    (elevated — partial)
+   RED    ≥ 55%       → base 0.42   (extreme — defensive floor, never zero)
+
+exposure factor = max(floor, base(regime) × ml_adjust)
+   ml_adjust = 1 − 0.5 × P(large move)     (the ML risk model, below)
+   floor ≈ 0.29 — the house always keeps a base position earning the (wide)
+   spread; the junior tranche absorbs the directional tail risk.
 
 LP target = 70% of total capital × exposure factor   (hard cap 5,000 dUSDC)
 ```
 
-Sticky: the engine only **adds** toward target (never force-exits), sourcing from the wallet first, then the Manager. A directional position is opened only when vol < 15% **and** ML confidence is high, hard-capped per position and per cycle.
+Thresholds are **calibrated to the venue's own observed vol distribution** (8,142 logged cycles: Green = bottom tercile, Red = top quartile) — so the posture is a live tri-state, not a stuck light. Sticky: the engine only **adds** toward target (never force-exits), sourcing from the wallet first, then the Manager.
 
 ---
 
 ## ML model
 
-A logistic regression predicts settlement direction (UP/DOWN) from 12 features: realized volatility, price trend, momentum, range, basis (forward−spot), time-of-day, day-of-week, and interaction terms.
+A logistic regression forecasts a **large move** — the event that actually hurts the house — from 12 features: realized volatility, price trend, momentum, range, basis (forward−spot), time-to-expiry, time-of-day, day-of-week, and interaction terms.
 
-- **CV accuracy: ~63%** (5-fold, vs 50% random baseline)
-- Retrained automatically as new oracles settle (3,400+ to date) via `watcher.ts`
+- **Label is horizon-normalized:** P(15-min-equivalent |settlement move| > 0.1%), with √time scaling — so the model predicts whether a window is unusually dangerous *per unit time*, instead of trivially learning "long windows move more" (which inflates AUC but pegs the live output at ~1.0)
+- **CV ROC-AUC: ~0.67** (5-fold, vs 0.5 random; a gradient-boosting reference hits ~0.75) — we report the honest, normalized number
+- Retrained automatically as new oracles settle (5,800+ training examples) via `watcher.ts`
 - Weights exported to `scripts/model_weights.json`, loaded at inference in `src/ml-model.ts`
-- Used as a **defensive risk signal** for LP exposure; directional betting is the small capped sleeve only
+- Used **only** as a defensive risk signal (`ml_adjust` above) — the directional sleeve it once powered is retired
 
 ```bash
 npm run collect    # fetch settled oracles → scripts/training_data.csv
@@ -181,13 +187,14 @@ src/
 ├── config.ts          # Contract addresses, scaling, LP + sizing policy
 ├── indexer.ts         # predict-server API (retry-hardened)
 ├── features.ts        # Market features from price history
-├── ml-model.ts        # Trained logistic-regression inference (risk signal)
-├── model.ts           # hermes3 sizing + reasoning for the directional sleeve
+├── ml-model.ts        # Trained large-move forecast inference (defensive risk signal)
+├── gate.ts            # EWMA-smoothed, hysteretic 🟢🟡🔴 regime + exposure floor
 ├── transactions.ts    # PTB builders (supply, supply-from-manager, mint, redeem, preview)
 ├── coins.ts           # dUSDC / PLP coin utilities
 ├── wallet.ts          # Sign, execute, devInspect
-├── cycle.ts           # LP engine (primary) + directional sleeve (secondary)
-├── watcher.ts         # Autonomous 60s loop
+├── cycle.ts           # LP engine (risk-gated, sticky)
+├── watcher.ts         # Autonomous 60s loop (advances the gate, retrains the model)
+├── vault-engine.ts    # Deploys multi-user vault reserve → PLP, posture-gated
 ├── vault.ts           # Tranched vault PTB builders (senior/junior) + state reads
 ├── vault-strategy.ts  # Operator: deploy vault reserve → PLP, mark NAV
 ├── posture.ts         # 🟢🟡🔴 risk-state posture (shared risk brain)

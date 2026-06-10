@@ -122,6 +122,23 @@ async function main() {
     return;
   }
 
+  if (cmd === 'daily') {
+    // Autonomous daily flywheel turn: route a slice of house edge into the
+    // pool, then rebate it to predictors pro-rata — the loop runs, not a demo.
+    const amt = isNaN(arg) ? 1 : arg;
+    const op = getAddress();
+    console.log(`\n━━━ Flywheel daily turn — ${new Date().toISOString()} ━━━`);
+    const f = await execute(buildFundPool((await getDusdcCoins(op)).coins, humanToDusdc(amt)));
+    console.log(`  ✓ funded ${amt} dUSDC (edge → pool)  ${f.digest}`);
+    const pool = await getRewardPool();
+    const plan = await computeRebates(Math.min(amt, pool.balance));
+    if (plan.length === 0) { console.log('  no external predictor volume — pool keeps the funding'); return; }
+    const r = await execute(buildRewardBatch(plan));
+    console.log(`  ✓ rebated ${Math.min(amt, pool.balance).toFixed(2)} dUSDC across ${plan.length} predictors (pool → traders)  ${r.digest}`);
+    console.log('Pool:', JSON.stringify(await getRewardPool()));
+    return;
+  }
+
   // status
   const [pool, vols] = await Promise.all([getRewardPool(), getPredictorVolumes()]);
   console.log('\n━━━ House Flywheel ━━━');

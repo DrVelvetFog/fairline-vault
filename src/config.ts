@@ -58,10 +58,11 @@ export const MAX_PLP_DUSDC  = 5000;
 // Only rebalance LP when the target/current gap exceeds this (dUSDC) — avoids churn.
 export const LP_REBALANCE_BAND = 20;
 
-// Volatility thresholds — bypass hermes3 above these levels.
-// 15-30%: supply to PLP (wide spread = LP earns more); >30%: skip entirely.
-export const HIGH_VOL_THRESHOLD     = 15;   // vol% → supply only, no directional
-export const EXTREME_VOL_THRESHOLD  = 30;   // vol% → skip entirely
+// Volatility regime thresholds, calibrated to the venue's own observed vol
+// distribution (8,142 logged cycles: p33 ≈ 30%, p75 ≈ 57%). Green = bottom
+// tercile, Red = top quartile — a live tri-state, not a stuck light.
+export const HIGH_VOL_THRESHOLD     = 30;   // vol% → AMBER, reduced exposure (≈ p33)
+export const EXTREME_VOL_THRESHOLD  = 55;   // vol% → RED, defensive floor (≈ p75)
 
 // Position sizing as a fraction of total balance.
 export const MIN_POSITION_PCT   = 0.01;  // 1%  — floor enforced in parseDecision

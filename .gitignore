@@ -30,3 +30,9 @@ contracts/**/Published.toml
 # Local backups — never commit
 *.old-single-tranche
 logs/gate-state.json
+
+# Faucet wallet key — never commit
+logs/faucet-wallet.json
+
+# Local Netlify folder
+.netlify

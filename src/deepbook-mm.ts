@@ -51,14 +51,15 @@ async function setup(amountSui: number) {
 async function quote() {
   const op = getAddress();
   const bm = bmOrThrow();
-  const [posture, mid, sui, deep] = await Promise.all([
-    getLivePosture(), readMid(op), readBmSui(bm, op), readBmDeep(bm, op),
-  ]);
+  const [posture, mid] = await Promise.all([getLivePosture(), readMid(op)]);
   if (mid === null) throw new Error('no mid price from pool');
-  console.log(`\n${POOL_NAME} mid ${mid.toFixed(8)} SUI/DEEP | posture ${posture.state} | inv: ${sui.toFixed(3)} SUI, ${deep.toFixed(3)} DEEP`);
 
-  // Always cancel stale quotes first.
+  // Cancel stale quotes BEFORE reading balances — funds locked in resting
+  // orders return to the manager on cancel, and quoting off the pre-cancel
+  // balance makes the maker skip its own re-quote.
   await execute(buildCancelAll(bm), 30_000_000);
+  const [sui, deep] = await Promise.all([readBmSui(bm, op), readBmDeep(bm, op)]);
+  console.log(`\n${POOL_NAME} mid ${mid.toFixed(8)} SUI/DEEP | posture ${posture.state} | inv: ${sui.toFixed(3)} SUI, ${deep.toFixed(3)} DEEP`);
 
   if (posture.state === 'RED') { console.log('🔴 RED — cancelled all, sitting flat.'); return; }
 

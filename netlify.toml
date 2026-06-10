@@ -1,3 +1,7 @@
-# FairLine marketing site — static, no build step.
+# FairLine marketing site — static publish + the judge-faucet function.
 [build]
   publish = "web"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

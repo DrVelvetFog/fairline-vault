@@ -89,6 +89,7 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
     <div class="row"><span class="k"><b style="color:var(--green)">Senior</b> · protected · ≤8% APR</span><span class="v"><span id="s-sen">—</span> · <span id="s-sen-px" class="mono">—</span></span></div>
     <div class="row"><span class="k"><b style="color:#e0a93c">Junior</b> · first-loss · leveraged</span><span class="v"><span id="s-jun">—</span> · <span id="s-jun-px" class="mono">—</span></span></div>
     <div class="row"><span class="k">Senior coverage</span><span class="v" id="s-cov">—</span></div>
+    <p style="font-size:12px;color:var(--faint);margin-top:10px;line-height:1.5">Waterfall: marked profit fills senior's 8% APR target first, then spills to junior; junior absorbs losses first. On testnet's thin trading volume the edge is still filling senior — junior's price rises once edge accrual outpaces the senior fill.</p>
   </div>
 
   <!-- vault & market conditions (read-only, no wallet needed) -->
@@ -104,6 +105,25 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
       <div class="abar"><span id="ab-deployed" style="width:0%;background:var(--green)"></span><span id="ab-reserve" style="width:0%;background:var(--blue)"></span></div>
       <div class="leg"><span><i style="background:var(--green)"></i>Deployed (house) <span id="ab-d" class="mono">—</span></span><span><i style="background:var(--blue)"></i>Idle reserve <span id="ab-r" class="mono">—</span></span></div>
     </div>
+  </div>
+
+  <!-- house flywheel (read-only, on-chain) -->
+  <div class="card">
+    <h2>🔁 House Flywheel <span class="tag">LIVE</span></h2>
+    <div class="row"><span class="k">Rebate pool</span><span class="v" id="fw-pool">—</span></div>
+    <div class="row"><span class="k">Lifetime rebated → predictors</span><span class="v" id="fw-rebated">—</span></div>
+    <div class="row"><span class="k">Payouts made</span><span class="v" id="fw-count">—</span></div>
+    <p style="font-size:12px;color:var(--faint);margin-top:10px;line-height:1.5">A slice of the house edge funds pro-rata rebates to real predictors daily — edge → rebates → volume → edge. <a href="https://suiscan.xyz/testnet/object/0x18e4b06c83aa7a4f2fde24989bdbbc94c5ebbfc78d9416fb10eafad2f0b3e5ee" target="_blank" rel="noopener">pool on-chain ↗</a></p>
+  </div>
+
+  <!-- DeepBook CLOB maker (read-only, on-chain) -->
+  <div class="card">
+    <h2>📖 DeepBook CLOB Maker <span class="tag" id="mm-tag">—</span></h2>
+    <div class="row"><span class="k">Pool</span><span class="v">DEEP/SUI (whitelisted)</span></div>
+    <div class="row"><span class="k">Mid price</span><span class="v" id="mm-mid">—</span></div>
+    <div class="row"><span class="k">Resting orders</span><span class="v" id="mm-orders">—</span></div>
+    <div class="row"><span class="k">Behavior (posture-gated)</span><span class="v" id="mm-behavior">—</span></div>
+    <p style="font-size:12px;color:var(--faint);margin-top:10px;line-height:1.5">The same risk gate runs a maker placing real limit orders on DeepBook's core orderbook — 🟢 tight + full · 🟡 wide + half · 🔴 cancel-all, flat. <a href="https://suiscan.xyz/testnet/object/0xa531d2a6c11d2f1130eaeac4e2be17ba3eb4684388cd52d2a811fca1a8d14e7e" target="_blank" rel="noopener">BalanceManager ↗</a></p>
   </div>
 
   <!-- connect prompt -->
@@ -124,6 +144,8 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
       <div class="row"><span class="k">Net deposited</span><span class="v" id="pos-net">—</span></div>
       <div class="row"><span class="k">Share price (S · J)</span><span class="v" id="pos-entry">—</span></div>
       <div class="row"><span class="k">Wallet dUSDC</span><span class="v" id="bal-dusdc">—</span></div>
+      <button class="btn btn-ghost" id="faucetBtn" style="margin-top:12px;width:100%;justify-content:center">🚰 Get test dUSDC (free, testnet)</button>
+      <div class="status" id="faucetStatus"></div>
     </div>
 
     <div class="card">
@@ -147,7 +169,7 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
     </div>
   </div>
 
-  <p class="note">Tranched FairLine Vault on Sui testnet · <a href="https://suiscan.xyz/testnet/object/0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e" target="_blank" rel="noopener">view contract ↗</a> · <a href="/">back to site</a><br>Need testnet dUSDC? Request it via the DeepBook Predict docs. Unaudited — testnet only.</p>
+  <p class="note">Tranched FairLine Vault on Sui testnet · <a href="https://suiscan.xyz/testnet/object/0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e" target="_blank" rel="noopener">view contract ↗</a> · <a href="/">back to site</a><br>Need testnet dUSDC? Connect a wallet and hit the 🚰 faucet button — 10 dUSDC + gas, free. Unaudited — testnet only.</p>
 </div>
 
 <script type="module">
@@ -175,7 +197,7 @@ const fmt=(n,d)=>Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maxim
 function status(el,kind,msg){el.className='status show '+kind;el.innerHTML=msg;}
 
 const PS='https://predict-server.testnet.mystenlabs.com';
-let reserve=0, deployed=0, sFlp=0, jFlp=0;
+let reserve=0, deployed=0, sFlp=0, jFlp=0, lastRegime='calm';
 
 // ── vault stats + tranches + house edge + allocation (no wallet needed) ──────
 async function loadStats(){
@@ -232,7 +254,8 @@ async function loadMarket(){
     }
     const first=win.length?Number(win[0].spot)/1e9:spot;
     const chg=first>0?(spot-first)/first*100:0;
-    const regime=vol>=30?'extreme':vol>=15?'elevated':'calm';
+    const regime=vol>=55?'extreme':vol>=30?'elevated':'calm';  // thresholds = config.ts (percentile-calibrated)
+    lastRegime=regime;
     const posture=regime==='extreme'?'Pull back — stop adding':regime==='elevated'?'Reduced exposure':'Full exposure';
     $('vm-spot').textContent='$'+fmt(spot,0);
     $('vm-vol').textContent=fmt(vol,1)+'%';
@@ -243,10 +266,54 @@ async function loadMarket(){
   }catch(e){}
 }
 
+// ── house flywheel — RewardPool object, read straight from chain ─────────────
+const REWARD_POOL='0x18e4b06c83aa7a4f2fde24989bdbbc94c5ebbfc78d9416fb10eafad2f0b3e5ee';
+async function loadFlywheel(){
+  try{
+    const o=await client.getObject({id:REWARD_POOL,options:{showContent:true}});
+    const f=o.data.content.fields;
+    $('fw-pool').textContent=fmt(Number(f.balance)/SCALE,2)+' dUSDC';
+    $('fw-rebated').textContent=fmt(Number(f.lifetime_rebated)/SCALE,2)+' dUSDC';
+    $('fw-count').textContent=f.rebate_count;
+  }catch(e){}
+}
+
+// ── DeepBook CLOB maker — mid price + resting orders via devInspect ──────────
+const DB_PKG='0x22be4cade64bf2d02412c7e8d0e8beea2f78828b948118d46735315409371a3c';
+const DB_POOL='0x48c95963e9eac37a316b7ae04a0deb761bcdcc2b67912374d6036e7f0e9bae9f';
+const DB_BM='0xa531d2a6c11d2f1130eaeac4e2be17ba3eb4684388cd52d2a811fca1a8d14e7e';
+const DEEP='0x36dbef866a1d62bf7328989a10fb2f07d769f4ee587c0de4a0a256e57e0a58a8::deep::DEEP';
+const SUI_T='0x2::sui::SUI';
+const u64le=b=>{let v=0n;for(let i=7;i>=0;i--)v=(v<<8n)|BigInt(b[i]);return v;};
+async function loadMaker(regime){
+  try{
+    const tx=new Transaction();
+    tx.moveCall({target:DB_PKG+'::pool::mid_price',typeArguments:[DEEP,SUI_T],arguments:[tx.object(DB_POOL),tx.object('0x6')]});
+    tx.moveCall({target:DB_PKG+'::pool::account_open_orders',typeArguments:[DEEP,SUI_T],arguments:[tx.object(DB_POOL),tx.object(DB_BM)]});
+    const r=await client.devInspectTransactionBlock({transactionBlock:tx,sender:DB_BM});
+    const midRaw=r.results?.[0]?.returnValues?.[0]?.[0];
+    const ordRaw=r.results?.[1]?.returnValues?.[0]?.[0];
+    if(midRaw)$('mm-mid').textContent=(Number(u64le(midRaw))/1e12).toFixed(8)+' SUI/DEEP';
+    const n=ordRaw&&ordRaw.length?ordRaw[0]:0;   // VecSet<u128> BCS: leading ULEB length
+    $('mm-orders').textContent=n;
+    const beh=regime==='extreme'?'🔴 cancel-all · flat':regime==='elevated'?'🟡 wide spread · half size':'🟢 tight spread · full size';
+    $('mm-behavior').textContent=beh;
+    const tag=$('mm-tag');tag.textContent=(regime==='extreme'?'RED':regime==='elevated'?'AMBER':'GREEN');tag.className='tag '+(regime||'calm');
+  }catch(e){}
+}
+
 // ── accrued P&L from this wallet's on-chain deposit/withdraw events ───────────
 async function queryEvents(type){
-  const r=await fetch(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"suix_queryEvents",params:[{MoveEventType:type},null,50,true]})}).then(x=>x.json());
-  return (r.result&&r.result.data)||[];
+  // Paginate so a depositor's history isn't truncated at 50 events.
+  let out=[],cursor=null;
+  for(let page=0;page<10;page++){
+    const r=await fetch(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"suix_queryEvents",params:[{MoveEventType:type},cursor,50,true]})}).then(x=>x.json());
+    const res=r.result||{};
+    out=out.concat(res.data||[]);
+    if(!res.hasNextPage||!res.nextCursor)break;
+    cursor=res.nextCursor;
+  }
+  return out;
 }
 async function loadPnl(){
   if(!account)return;
@@ -338,6 +405,21 @@ async function execTx(tx){
 }
 const scan=d=>`<a href="https://suiscan.xyz/testnet/tx/${d}" target="_blank" rel="noopener">${d.slice(0,10)}… ↗</a>`;
 
+// ── judge faucet — 10 dUSDC + gas in one click ───────────────────────────────
+$('faucetBtn').onclick=async()=>{
+  if(!account)return;
+  const el=$('faucetStatus'), btn=$('faucetBtn');
+  btn.disabled=true; status(el,'info','Requesting test funds…');
+  try{
+    const r=await fetch('/.netlify/functions/faucet',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({address:account.address})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    status(el,'ok','✓ Sent 10 dUSDC + 0.05 SUI gas. Tx '+scan(j.digest));
+    setTimeout(loadBalances,2500);
+  }catch(e){status(el,'err','Faucet: '+(e.message||e));}
+  finally{btn.disabled=false;}
+};
+
 // ── tranche toggles ──────────────────────────────────────────────────────────
 function setDep(t){depTranche=t;$('dep-s').classList.toggle('active',t==='senior');$('dep-j').classList.toggle('active',t==='junior');}
 function setW(t){wTranche=t;$('w-s').classList.toggle('active',t==='senior');$('w-j').classList.toggle('active',t==='junior');}
@@ -393,7 +475,7 @@ $('wBtn').onclick=async()=>{
   }catch(e){status($('wStatus'),'err','Failed: '+(e.message||e));}
 };
 
-function refreshAll(){ loadStats(); loadMarket(); if(account) loadBalances(); }
+function refreshAll(){ loadStats(); loadFlywheel(); loadMarket().then(()=>loadMaker(lastRegime)); if(account) loadBalances(); }
 refreshAll(); setInterval(refreshAll,15000);
 </script>
 </body>

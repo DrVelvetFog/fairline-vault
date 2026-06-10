@@ -1,10 +1,10 @@
 {
   "objective": "large_move",
   "threshold_pct": 0.1,
-  "base_rate": 0.109811,
-  "cv_auc": 0.804201,
-  "cv_accuracy": 0.718231,
-  "gb_cv_auc": 0.867161,
+  "base_rate": 0.416179,
+  "cv_auc": 0.66566,
+  "cv_accuracy": 0.618429,
+  "gb_cv_auc": 0.746345,
   "trained_on": 5810,
   "features": [
     "realized_vol",
@@ -22,26 +22,26 @@
   ],
   "top_features": [
     [
-      "mins_to_expiry",
-      6.5135
-    ],
-    [
       "range_pct",
-      1.0797
+      1.2005
     ],
     [
       "realized_vol",
-      -0.5191
+      -0.8229
     ],
     [
-      "trend_pct",
-      0.4288
+      "dow_sin",
+      0.2293
     ],
     [
       "hour_sin",
-      -0.2825
+      -0.2042
+    ],
+    [
+      "trend_pct",
+      0.1813
     ]
   ],
-  "trained_at": "2026-06-07T13:46:44.608341+00:00",
-  "edge_over_random_pp": 30.42
+  "trained_at": "2026-06-10T12:53:29.786511+00:00",
+  "edge_over_random_pp": 16.57
 }

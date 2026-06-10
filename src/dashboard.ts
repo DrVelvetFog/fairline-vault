@@ -565,7 +565,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
       <div class="row"><span class="k">Senior coverage</span><span class="v" id="v-cov">—</span></div>
       <div class="row"><span class="k">Last marked</span><span class="v" id="v-marked">—</span></div>
       <div class="note">
-        Tranched on-chain vault — deposit into the senior (protected) or junior (first-loss, leveraged) tranche. Junior absorbs losses first; senior earns up to its target, junior takes the upside tail.
+        Tranched on-chain vault — deposit into the senior (protected) or junior (first-loss, leveraged) tranche. Junior absorbs losses first; senior earns up to its target, junior takes the upside tail. On testnet's thin volume the edge is still filling senior's 8% target — junior's price rises once accrual outpaces the senior fill.
         <span class="mono" id="v-addr">—</span>
       </div>
     </div>

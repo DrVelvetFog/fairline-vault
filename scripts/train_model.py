@@ -25,15 +25,24 @@ from sklearn.pipeline import Pipeline
 
 DATA_PATH   = "scripts/training_data.csv"
 WEIGHTS_OUT = "scripts/model_weights.json"
-LARGE_MOVE_THRESHOLD_PCT = 0.10   # |settlement move| above this = "large move" (~p90 of the data)
+LARGE_MOVE_THRESHOLD_PCT = 0.10   # 15-min-equivalent |move| above this = "large move" (~p58 normalized)
+NORM_HORIZON_MIN = 15.0           # normalize moves to this horizon (√time scaling)
 
 # ── Load + label ──────────────────────────────────────────────────────────────
+# Label on the HORIZON-NORMALIZED move: |move| · √(15 / mins_to_expiry). A raw
+# |move| > 0.1% is trivially certain over a 43-hour oracle and ~p90 over 15
+# minutes — without normalization the model just learns "long windows move
+# more" (mins_to_expiry dominated, live P pegged at 0.99). Normalized, it
+# forecasts whether the window is unusually dangerous PER UNIT TIME, which is
+# what the defensive gate actually needs, at any horizon.
 
 df = pd.read_csv(DATA_PATH)
 print(f"Loaded {len(df)} examples")
-df["label_big"] = (df["move_pct"].abs() > LARGE_MOVE_THRESHOLD_PCT).astype(int)
+norm = np.sqrt(NORM_HORIZON_MIN / df["mins_to_expiry"].clip(lower=0.25))
+df["norm_move"] = df["move_pct"].abs() * norm
+df["label_big"] = (df["norm_move"] > LARGE_MOVE_THRESHOLD_PCT).astype(int)
 base_rate = df["label_big"].mean()
-print(f"Label: P(|move| > {LARGE_MOVE_THRESHOLD_PCT}%) — large-move base rate "
+print(f"Label: P(15-min-equivalent |move| > {LARGE_MOVE_THRESHOLD_PCT}%) — base rate "
       f"{base_rate*100:.1f}% ({int(df['label_big'].sum())} of {len(df)})")
 
 # ── Feature engineering ───────────────────────────────────────────────────────
@@ -109,7 +118,8 @@ weights = {
     "coef":         clf.coef_[0].tolist(),
     "intercept":    float(clf.intercept_[0]),
     "trained_on":   len(df),
-    "label":        f"1 = |settlement move| > {LARGE_MOVE_THRESHOLD_PCT}% (large move that threatens the house)",
+    "label":        f"1 = 15-min-equivalent |settlement move| > {LARGE_MOVE_THRESHOLD_PCT}% (√time-normalized; large move that threatens the house)",
+    "norm_horizon_min": NORM_HORIZON_MIN,
 }
 with open(WEIGHTS_OUT, "w") as f:
     json.dump(weights, f, indent=2)
@@ -132,5 +142,5 @@ with open("scripts/model_stats.json", "w") as f:
     json.dump(stats, f, indent=2)
 
 print(f"\n✅ Weights → {WEIGHTS_OUT}")
-print(f"   Forecasts P(|move| > {LARGE_MOVE_THRESHOLD_PCT}%)  |  CV ROC-AUC {lr_auc.mean():.4f} (0.5 = random)")
+print(f"   Forecasts P(15-min-equivalent |move| > {LARGE_MOVE_THRESHOLD_PCT}%)  |  CV ROC-AUC {lr_auc.mean():.4f} (0.5 = random)")
 print(f"   Stats → scripts/model_stats.json")

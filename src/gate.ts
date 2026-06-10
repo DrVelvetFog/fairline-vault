@@ -20,8 +20,8 @@ export type Regime = 'GREEN' | 'AMBER' | 'RED';
 export interface GateState { smoothedVol: number; regime: Regime; ts: string }
 
 const STATE_FILE = 'logs/gate-state.json';
-const EWMA_ALPHA = 0.4;     // weight on the newest reading (lower = smoother)
-const HYST = 5;             // % buffer to exit a tighter regime (anti-chatter)
+const EWMA_ALPHA = 0.25;    // weight on the newest reading (lower = smoother)
+const HYST = 8;             // % buffer to exit a tighter regime (anti-chatter; scaled to the 30/55 thresholds)
 
 // Exposure factor per regime (× ML adjust). RED is a FLOOR, not zero — always
 // capture some spread. Tune these to trade edge capture vs drawdown.
