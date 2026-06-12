@@ -77,6 +77,15 @@ Six features, each built and verified live:
 Depositors interact through a real **wallet-connect dApp** (Slush), not a script:
 deposit dUSDC into a tranche → receive FLP-S/FLP-J → withdraw pro-rata, any time.
 
+## Our own Move contracts (live on testnet)
+
+A tranched, NAV-based share vault (`fairline_vault`) — `vault.move` +
+`flp_s.move` / `flp_j.move` (tranche tokens) + `rewards.move` (flywheel pool),
+**6 passing unit tests** across the package, two clean package upgrades
+(capacity, then rewards). Composes atomically with Predict (one PTB:
+`vault.deploy` → `predict.supply`). Mark/settle run the senior/junior waterfall
+and stamp `marked_at` so freshness is provable on-chain.
+
 ## What makes it unique
 
 | | Generic vaults (Yearn) | "Be the house" LP vaults (GMX **GLP**, Jupiter **JLP**) | Tranching protocols (BarnBridge, Idle) | **FairLine** |
@@ -103,6 +112,13 @@ running a bot or taking uncapped downside. The tell that FairLine is a product,
 not a maker: it **caps capacity and refuses deposits** when they'd dilute yield. A
 market maker always wants more capital; FairLine optimizes the depositor's return.
 
+**And against the analytics/tooling entries this track attracts:** terminals,
+vol-surface viewers and arb bots make this market smarter *for professionals* —
+FairLine packages the house edge so everyone else can *hold* it. An options
+ecosystem needs both layers. We are the product layer, not the tooling layer:
+the structural edge those tools surface is exactly what FairLine's depositors
+already earn, on-chain, today.
+
 ## Meaningful DeepBook integration (the track, directly)
 
 - **Predict liquidity** — atomic PTBs for `supply`, withdraw→supply straight from
@@ -113,15 +129,6 @@ market maker always wants more capital; FairLine optimizes the depositor's retur
   `cancel_all_orders`, `mid_price`), through a DeepBook BalanceManager, on the
   whitelisted DEEP/SUI pool. This is direct, verifiable liquidity provision on
   DeepBook's central limit order book — the heart of the track.
-
-## Our own Move contracts (live on testnet)
-
-A tranched, NAV-based share vault (`fairline_vault`) — `vault.move` +
-`flp_s.move` / `flp_j.move` (tranche tokens) + `rewards.move` (flywheel pool),
-**6 passing unit tests** across the package, two clean package upgrades
-(capacity, then rewards). Composes atomically with Predict (one PTB:
-`vault.deploy` → `predict.supply`). Mark/settle run the senior/junior waterfall
-and stamp `marked_at` so freshness is provable on-chain.
 
 ## Verified live on-chain
 

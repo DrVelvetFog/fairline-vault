@@ -462,7 +462,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
 <div class="metrics">
   <div class="metric hero"><div class="lbl">PLP Position</div><div class="val" id="m-plp" style="color:var(--green)">—</div><div class="sub" id="m-plp-sub">liquidity supplied · the house</div></div>
-  <div class="metric"><div class="lbl">House Edge</div><div class="val" id="m-edge" style="color:var(--green)">—</div><div class="sub">PLP redemption rate</div></div>
+  <div class="metric hero"><div class="lbl">House Edge · measured on-chain</div><div class="val" id="m-edge" style="color:var(--green)">—</div><div class="sub">PLP redeems at <span class="mono" id="m-edge-rate">—</span> per 1.0000 · reserves ÷ supply</div><canvas id="edge-spark" style="width:100%;height:30px;display:block;margin-top:8px"></canvas></div>
   <div class="metric"><div class="lbl">Total Capital</div><div class="val" id="m-bal">—</div><div class="sub">PLP + wallet + manager</div></div>
   <div class="metric"><div class="lbl">LP Exposure</div><div class="val" id="m-exp">—</div><div class="sub" id="m-exp-sub">of target</div></div>
   <div class="metric"><div class="lbl">Sleeve P&amp;L</div><div class="val" id="m-pnl">—</div><div class="sub" id="m-pnl-sub">directional · experimental</div></div>
@@ -845,6 +845,8 @@ async function loadPlp(){
     document.getElementById('m-edge').textContent=(d.house_edge_pct>=0?'+':'')+d.house_edge_pct.toFixed(3)+'%';
     document.getElementById('w-plp').textContent=held.toFixed(2)+' dUSDC';
     document.getElementById('lp-rate').textContent=d.redemption_rate.toFixed(6);
+    document.getElementById('m-edge-rate').textContent=d.redemption_rate.toFixed(6);
+    document.getElementById('m-edge').style.color=d.house_edge_pct>=0?'var(--green)':'var(--red)';
     document.getElementById('lp-edge').textContent=(d.house_edge_pct>=0?'+':'')+d.house_edge_pct.toFixed(4)+'%';
     document.getElementById('lp-edge').style.color=d.house_edge_pct>=0?'var(--green)':'var(--red)';
     if(d.lp_engine){
@@ -906,6 +908,16 @@ async function loadAccrual(){
   ctx.fillStyle='#7d8896';ctx.font='10px monospace';
   ctx.fillText('+'+max.toFixed(3)+'%',4,12);
   ctx.fillText(pts.length+' pts',W-46,12);
+  // hero-tile sparkline (same series, compact)
+  const sc=document.getElementById('edge-spark');
+  if(sc){
+    const w2=sc.clientWidth||260,h2=30;sc.width=w2;sc.height=h2;
+    const c2=sc.getContext('2d');
+    const sy=v=>h2-3-((v-min)/span)*(h2-6);
+    c2.beginPath();c2.moveTo(2,sy(vals[0]));
+    for(let i=1;i<vals.length;i++)c2.lineTo(2+i/(vals.length-1)*(w2-4),sy(vals[i]));
+    c2.strokeStyle='#3fd77a';c2.lineWidth=1.5;c2.stroke();
+  }
 }
 
 async function loadPosture(){
