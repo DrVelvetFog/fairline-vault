@@ -225,14 +225,14 @@ contracts/fairline_vault/sources/
 | dUSDC | `0xe95040085976bfd54a1a07225cd46c8a2b4e8e2b6732f140a0fc49850ba73e1a::dusdc::DUSDC` |
 | PLP | `0xf5ea2b...::plp::PLP` |
 | **FairLine package** (types) | `0x8c5c7e1205468970100265c17a8c9a80fe43d67bfed0230cb807f1f75e7029e4` |
-| **FairLine package** (latest, for calls) | `0x686d8d1609d259b751dca545f99d5e186fd3d7e7f59cdd3838e79ecdf457c7bd` |
+| **FairLine package** (latest, for calls) | `0xe3623bf56d4e2d0e707bad639266bbfced8b9199c0c50b2992768def6d4ba39e` |
 | **FairLine Vault\<dUSDC\>** (shared) | `0x6f50a5439ef6df079f5807c93ac5bf14aa14f39841448395eb7ac8e40287d71e` |
 | **FLP-S / FLP-J share tokens** | `<pkg>::flp_s::FLP_S` · `<pkg>::flp_j::FLP_J` |
 | **Reward pool** (flywheel) | `0x18e4b06c83aa7a4f2fde24989bdbbc94c5ebbfc78d9416fb10eafad2f0b3e5ee` |
 | **DeepBook v3 package** | `0x22be4cade64bf2d02412c7e8d0e8beea2f78828b948118d46735315409371a3c` |
 | **DeepBook DEEP/SUI pool** (CLOB maker) | `0x48c95963e9eac37a316b7ae04a0deb761bcdcc2b67912374d6036e7f0e9bae9f` |
 
-> Note: the vault package was published then upgraded twice (capacity cap, then the rewards module). Move **types** (Vault, FLP-S/J) are identified by the original publish id; **function calls** target the latest id. The old single-tranche vault (`0xfe5abfde…` / `0x71a3…`) remains on-chain, unwired.
+> Note: the vault package was published then upgraded three times (capacity cap, the rewards module, then security hardening: emergency pause + a 15% reserve floor on deploys). Move **types** (Vault, FLP-S/J) are identified by the original publish id; **function calls** target the latest id. The old single-tranche vault (`0xfe5abfde…` / `0x71a3…`) remains on-chain, unwired.
 
 ---
 

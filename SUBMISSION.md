@@ -81,8 +81,10 @@ deposit dUSDC into a tranche → receive FLP-S/FLP-J → withdraw pro-rata, any 
 
 A tranched, NAV-based share vault (`fairline_vault`) — `vault.move` +
 `flp_s.move` / `flp_j.move` (tranche tokens) + `rewards.move` (flywheel pool),
-**7 passing unit tests** across the package, two clean package upgrades
-(capacity, then rewards). Composes atomically with Predict (one PTB:
+**11 passing unit tests** across the package, three clean package upgrades
+(capacity, rewards, then security hardening — an emergency **pause** and a 15%
+**reserve floor** on deploys so depositors always keep withdrawal liquidity and
+no single deploy can drain the vault). Composes atomically with Predict (one PTB:
 `vault.deploy` → `predict.supply`). Mark/settle run the senior/junior waterfall
 and stamp `marked_at` so freshness is provable on-chain.
 

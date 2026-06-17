@@ -167,6 +167,17 @@ export function buildRedemptionAnchoredSettle(
   return tx;
 }
 
+/** Operator: emergency pause/unpause (halts deposits + deploys; withdrawals stay open). */
+export function buildSetPaused(paused: boolean): Transaction {
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${MOD}::set_paused`,
+    typeArguments: [DUSDC_TYPE],
+    arguments: [tx.object(VAULT_ADMIN_CAP), tx.object(VAULT_OBJECT), tx.pure.bool(paused)],
+  });
+  return tx;
+}
+
 /** Operator: mark-to-market the deployed value (no cash move; runs waterfall + stamps time). */
 export function buildVaultMark(newDeployedRaw: bigint): Transaction {
   const tx = new Transaction();

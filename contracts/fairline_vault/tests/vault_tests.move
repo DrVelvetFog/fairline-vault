@@ -58,7 +58,7 @@ fun tranche_profit_waterfall_and_withdraw() {
     {
         let cap = sc.take_from_sender<AdminCap>();
         let mut v = sc.take_shared<Vault<SUI>>();
-        let d = vault::deploy(&cap, &mut v, 2000, sc.ctx());
+        let d = vault::deploy_unchecked(&cap, &mut v, 2000, sc.ctx());
         transfer::public_transfer(d, OP);
         ts::return_shared(v);
         sc.return_to_sender(cap);
@@ -119,7 +119,7 @@ fun junior_absorbs_loss_then_wipes() {
     sc.next_tx(BOB);
     { let mut v = sc.take_shared<Vault<SUI>>(); let j = vault::deposit_junior(&mut v, coin::mint_for_testing<SUI>(1000, sc.ctx()), sc.ctx()); transfer::public_transfer(j, BOB); ts::return_shared(v); };
     sc.next_tx(OP);
-    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy(&cap, &mut v, 2000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
+    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy_unchecked(&cap, &mut v, 2000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
 
     // Mark a 200 loss (deployed 2000 → 1800). Junior absorbs all of it; senior intact.
     sc.next_tx(OP);
@@ -169,7 +169,7 @@ fun settle_realized_loss_is_withdrawable() {
     sc.next_tx(BOB);
     { let mut v = sc.take_shared<Vault<SUI>>(); let j = vault::deposit_junior(&mut v, coin::mint_for_testing<SUI>(1000, sc.ctx()), sc.ctx()); transfer::public_transfer(j, BOB); ts::return_shared(v); };
     sc.next_tx(OP);
-    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy(&cap, &mut v, 2000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
+    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy_unchecked(&cap, &mut v, 2000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
 
     // Settle back only 1700 of the 2000 deployed (realized loss 300), all reserve.
     // Junior absorbs the whole 300; senior protected.
@@ -199,7 +199,7 @@ fun settle_realized_loss_is_withdrawable() {
     // Now redeploy senior's remaining 1000 and realize a catastrophic loss: settle
     // back 600. Junior is already gone, so senior takes the residual haircut to 600.
     sc.next_tx(OP);
-    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy(&cap, &mut v, 1000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
+    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy_unchecked(&cap, &mut v, 1000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
     sc.next_tx(OP);
     {
         let cap = sc.take_from_sender<AdminCap>();
@@ -257,7 +257,7 @@ fun withdraw_blocked_when_deployed() {
     sc.next_tx(ALICE);
     { let mut v = sc.take_shared<Vault<SUI>>(); let s = vault::deposit_senior(&mut v, coin::mint_for_testing<SUI>(1000, sc.ctx()), sc.ctx()); transfer::public_transfer(s, ALICE); ts::return_shared(v); };
     sc.next_tx(OP);
-    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy(&cap, &mut v, 1000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
+    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy_unchecked(&cap, &mut v, 1000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
     sc.next_tx(ALICE);
     {
         let mut v = sc.take_shared<Vault<SUI>>();
@@ -267,6 +267,81 @@ fun withdraw_blocked_when_deployed() {
         ts::return_shared(v);
     };
 
+    clock::destroy_for_testing(clk);
+    sc.end();
+}
+
+// ── Security hardening tests (pause + reserve floor) ──────────────────────────
+
+#[test, expected_failure(abort_code = fairline_vault::vault::EReserveFloor)]
+fun deploy_breaches_reserve_floor_aborts() {
+    let mut sc = ts::begin(OP);
+    let clk = clock::create_for_testing(sc.ctx());
+    bootstrap(&mut sc, &clk);
+    sc.next_tx(ALICE);
+    { let mut v = sc.take_shared<Vault<SUI>>(); let s = vault::deposit_senior(&mut v, coin::mint_for_testing<SUI>(1000, sc.ctx()), sc.ctx()); transfer::public_transfer(s, ALICE); ts::return_shared(v); };
+    sc.next_tx(OP);
+    {
+        let cap = sc.take_from_sender<AdminCap>();
+        let mut v = sc.take_shared<Vault<SUI>>();
+        // 900 of 1000 reserve would leave 100 < 150 (15% of NAV) → must abort.
+        let d = vault::deploy(&cap, &mut v, 900, sc.ctx());
+        transfer::public_transfer(d, OP);
+        ts::return_shared(v);
+        sc.return_to_sender(cap);
+    };
+    clock::destroy_for_testing(clk);
+    sc.end();
+}
+
+#[test]
+fun deploy_respects_reserve_floor() {
+    let mut sc = ts::begin(OP);
+    let clk = clock::create_for_testing(sc.ctx());
+    bootstrap(&mut sc, &clk);
+    sc.next_tx(ALICE);
+    { let mut v = sc.take_shared<Vault<SUI>>(); let s = vault::deposit_senior(&mut v, coin::mint_for_testing<SUI>(1000, sc.ctx()), sc.ctx()); transfer::public_transfer(s, ALICE); ts::return_shared(v); };
+    sc.next_tx(OP);
+    {
+        let cap = sc.take_from_sender<AdminCap>();
+        let mut v = sc.take_shared<Vault<SUI>>();
+        // 850 of 1000 leaves exactly 150 (15% of NAV) — allowed.
+        let d = vault::deploy(&cap, &mut v, 850, sc.ctx());
+        assert!(vault::reserve_value(&v) == 150, 0);
+        assert!(vault::deployed(&v) == 850, 1);
+        transfer::public_transfer(d, OP);
+        ts::return_shared(v);
+        sc.return_to_sender(cap);
+    };
+    clock::destroy_for_testing(clk);
+    sc.end();
+}
+
+#[test, expected_failure(abort_code = fairline_vault::vault::EPaused)]
+fun paused_blocks_deposit() {
+    let mut sc = ts::begin(OP);
+    let clk = clock::create_for_testing(sc.ctx());
+    bootstrap(&mut sc, &clk);
+    sc.next_tx(OP);
+    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); vault::set_paused(&cap, &mut v, true); ts::return_shared(v); sc.return_to_sender(cap); };
+    sc.next_tx(ALICE);
+    { let mut v = sc.take_shared<Vault<SUI>>(); let s = vault::deposit_senior(&mut v, coin::mint_for_testing<SUI>(100, sc.ctx()), sc.ctx()); transfer::public_transfer(s, ALICE); ts::return_shared(v); };
+    clock::destroy_for_testing(clk);
+    sc.end();
+}
+
+#[test]
+fun withdraw_works_when_paused() {
+    let mut sc = ts::begin(OP);
+    let clk = clock::create_for_testing(sc.ctx());
+    bootstrap(&mut sc, &clk);
+    sc.next_tx(ALICE);
+    { let mut v = sc.take_shared<Vault<SUI>>(); let s = vault::deposit_senior(&mut v, coin::mint_for_testing<SUI>(500, sc.ctx()), sc.ctx()); transfer::public_transfer(s, ALICE); ts::return_shared(v); };
+    sc.next_tx(OP);
+    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); vault::set_paused(&cap, &mut v, true); assert!(vault::is_paused(&v), 0); ts::return_shared(v); sc.return_to_sender(cap); };
+    // Withdrawals must still work while paused.
+    sc.next_tx(ALICE);
+    { let mut v = sc.take_shared<Vault<SUI>>(); let s = sc.take_from_sender<Coin<FLP_S>>(); let out = vault::withdraw_senior(&mut v, s, sc.ctx()); assert!(coin::value(&out) == 500, 1); transfer::public_transfer(out, ALICE); ts::return_shared(v); };
     clock::destroy_for_testing(clk);
     sc.end();
 }

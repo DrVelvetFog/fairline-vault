@@ -27,8 +27,13 @@ use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin, TreasuryCap};
 use sui::clock::Clock;
 use sui::event;
+use sui::dynamic_field as df;
 use fairline_vault::flp_s::{Self, FLP_S, HolderS};
 use fairline_vault::flp_j::{Self, FLP_J, HolderJ};
+
+/// Dynamic-field key for the emergency-pause flag. Stored as a dynamic field (not
+/// a struct field) so it can be added to the already-published Vault by upgrade.
+public struct PausedKey has copy, drop, store {}
 
 /// Shared tranched vault, generic over the quote asset `T` (e.g. dUSDC).
 public struct Vault<phantom T> has key {
@@ -57,12 +62,19 @@ const MS_PER_YEAR: u128      = 31_536_000_000;  // 365d in ms
 // it can productively deploy rather than silently diluting everyone's yield.
 const VAULT_CAPACITY: u64 = 3_000_000_000;      // 3,000 dUSDC (6 decimals)
 
+// Withdrawal-liquidity / anti-drain floor: a deploy must leave at least this
+// fraction of NAV idle in reserve, so (a) depositors always have liquidity to
+// withdraw and (b) a single compromised-key deploy can never pull 100% out.
+const MIN_RESERVE_BPS: u64 = 1_500;             // 15% of NAV must stay liquid
+
 // ── Errors ──────────────────────────────────────────────────────────────────
 const EZeroAmount: u64 = 0;
 const EInsufficientReserve: u64 = 1;
 const EZeroShares: u64 = 2;
 const EDeployTooLarge: u64 = 3;
 const ECapacityFull: u64 = 4;
+const EPaused: u64 = 5;                          // vault paused — deposits/deploys halted
+const EReserveFloor: u64 = 6;                    // deploy would breach the 15% reserve floor
 
 // ── Events ──────────────────────────────────────────────────────────────────
 public struct Deposited has copy, drop { depositor: address, tranche: u8, amount: u64, shares: u64, senior_value: u64, nav: u64 }
@@ -70,6 +82,7 @@ public struct Withdrawn has copy, drop { withdrawer: address, tranche: u8, share
 public struct Deployed has copy, drop { amount: u64, total_deployed: u64 }
 public struct Settled has copy, drop { returned: u64, new_deployed: u64, senior_value: u64, nav: u64, marked_at: u64 }
 public struct Marked has copy, drop { old_nav: u64, new_nav: u64, senior_value: u64, junior_value: u64, marked_at: u64 }
+public struct PauseSet has copy, drop { paused: bool }
 
 const TR_SENIOR: u8 = 0;
 const TR_JUNIOR: u8 = 1;
@@ -110,6 +123,11 @@ public fun senior_shares<T>(v: &Vault<T>): u64 { coin::total_supply(&v.s_treasur
 public fun junior_shares<T>(v: &Vault<T>): u64 { coin::total_supply(&v.j_treasury) }
 public fun marked_at<T>(v: &Vault<T>): u64 { v.marked_at }
 public fun capacity<T>(_v: &Vault<T>): u64 { VAULT_CAPACITY }
+/// Emergency-pause state. When true, deposits and deploys are halted; withdrawals
+/// are NEVER pausable so depositors can always exit.
+public fun is_paused<T>(v: &Vault<T>): bool {
+    df::exists_(&v.id, PausedKey {}) && *df::borrow<PausedKey, bool>(&v.id, PausedKey {})
+}
 
 fun min_u64(a: u64, b: u64): u64 { if (a < b) a else b }
 
@@ -117,6 +135,7 @@ fun min_u64(a: u64, b: u64): u64 { if (a < b) a else b }
 
 /// Deposit into the SENIOR tranche; receive FLP-S at the senior share price.
 public fun deposit_senior<T>(v: &mut Vault<T>, coin: Coin<T>, ctx: &mut TxContext): Coin<FLP_S> {
+    assert!(!is_paused(v), EPaused);
     let amount = coin::value(&coin);
     assert!(amount > 0, EZeroAmount);
     assert!(nav(v) + amount <= VAULT_CAPACITY, ECapacityFull);
@@ -138,6 +157,7 @@ public fun deposit_senior<T>(v: &mut Vault<T>, coin: Coin<T>, ctx: &mut TxContex
 
 /// Deposit into the JUNIOR tranche; receive FLP-J at the junior share price.
 public fun deposit_junior<T>(v: &mut Vault<T>, coin: Coin<T>, ctx: &mut TxContext): Coin<FLP_J> {
+    assert!(!is_paused(v), EPaused);
     let amount = coin::value(&coin);
     assert!(amount > 0, EZeroAmount);
     assert!(nav(v) + amount <= VAULT_CAPACITY, ECapacityFull);
@@ -221,12 +241,28 @@ fun apply_pnl<T>(v: &mut Vault<T>, old_nav: u64, new_nav: u64, now_ms: u64) {
 /// Move `amount` of idle reserve out to run the LP strategy. Value is conserved
 /// (reserve down, deployed up), so NAV and both tranches are unchanged.
 public fun deploy<T>(_: &AdminCap, v: &mut Vault<T>, amount: u64, ctx: &mut TxContext): Coin<T> {
+    assert!(!is_paused(v), EPaused);
     assert!(amount > 0, EZeroAmount);
-    assert!(amount <= balance::value(&v.reserve), EInsufficientReserve);
+    let reserve_bal = balance::value(&v.reserve);
+    assert!(amount <= reserve_bal, EInsufficientReserve);
+    // Must leave ≥ MIN_RESERVE_BPS of NAV idle (NAV is invariant across deploy):
+    // guarantees withdrawal liquidity and caps a single deploy below 100% drain.
+    assert!(((reserve_bal - amount) as u128) * BPS_DENOM >= (nav(v) as u128) * (MIN_RESERVE_BPS as u128), EReserveFloor);
     v.deployed = v.deployed + amount;
     let out = coin::take(&mut v.reserve, amount, ctx);
     event::emit(Deployed { amount, total_deployed: v.deployed });
     out
+}
+
+/// Operator: set or clear the emergency pause (halts deposits + deploys).
+/// Withdrawals are never gated, so depositors can always exit even while paused.
+public fun set_paused<T>(_: &AdminCap, v: &mut Vault<T>, paused: bool) {
+    if (df::exists_(&v.id, PausedKey {})) {
+        *df::borrow_mut<PausedKey, bool>(&mut v.id, PausedKey {}) = paused;
+    } else {
+        df::add(&mut v.id, PausedKey {}, paused);
+    };
+    event::emit(PauseSet { paused });
 }
 
 /// Return strategy capital and report remaining deployed value; runs the
@@ -255,3 +291,12 @@ public fun mark<T>(_: &AdminCap, v: &mut Vault<T>, new_deployed: u64, clock: &Cl
 // ── Test-only init ──────────────────────────────────────────────────────────────
 #[test_only]
 public fun init_for_testing(ctx: &mut TxContext) { init(ctx) }
+
+// Test-only: move reserve→deployed without the reserve-floor/pause checks, so the
+// waterfall/withdrawal tests can set up 100%-deployed scenarios. The real `deploy`
+// (with floor + pause) is exercised by the dedicated floor/pause tests.
+#[test_only]
+public fun deploy_unchecked<T>(_: &AdminCap, v: &mut Vault<T>, amount: u64, ctx: &mut TxContext): Coin<T> {
+    v.deployed = v.deployed + amount;
+    coin::take(&mut v.reserve, amount, ctx)
+}
