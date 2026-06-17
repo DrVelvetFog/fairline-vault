@@ -145,8 +145,13 @@ multi-user TVL. NAV's deployed-mark is *computed* from the on-chain PLP redempti
 rate — so anyone can recompute it — though today it's submitted by the operator
 (`new_deployed`) rather than read on-chain by the contract. That last step is the
 one documented trust assumption; it's bounded (`settle` can't claim more than was
-returned) and timestamped on-chain (`marked_at`), and the mainnet path reads the
-rate on-chain to remove the operator entirely.
+returned) and timestamped on-chain (`marked_at`). We tighten it further with a
+**redemption-anchored settle** (proven on testnet): one PTB redeems the deployed
+PLP through `predict::withdraw` and settles the *chain-enforced* proceeds, so each
+checkpoint realizes NAV to real reserve the operator can't inflate — only the small
+between-checkpoint drift stays asserted. (A fully on-chain NAV *read* in Move isn't
+possible against the current Predict build — it exposes no PLP-value view — so we
+realize the value trustlessly rather than assert it.)
 
 ## Transparency as a product
 
@@ -158,11 +163,16 @@ on-chain." We say testnet and unaudited, plainly.
 
 ## Long-term vision
 
-The risk brain is swappable and already governs two venues; the same vault
-framework scales to mainnet DeepBook markets and can host other strategies. Next:
-fully-trustless on-chain NAV in Move, depositor-funded CLOB market-making (once a
-dUSDC↔DeepBook market exists), and senior coverage enforced on-chain. DeepBook
-Predict is testnet-only today, so mainnet is upstream-blocked, not faked.
+The risk brain is swappable and already governs two venues, and the vault
+framework can host other strategies. The two venues have **different mainnet
+paths**: DeepBook's core orderbook is *already live on mainnet*, so the CLOB-maker
+sleeve can ship there after hardening + audit, independent of anything upstream —
+whereas the Predict-house sleeve is **upstream-gated** (DeepBook Predict is
+testnet-only today; the package does not exist on mainnet — verified on-chain, not
+faked). So the mainnet path is partial-ready, not blocked. Next: make the
+redemption-anchored settle the canonical mark path, depositor-funded CLOB
+market-making (once a dUSDC↔DeepBook market exists), and senior coverage enforced
+on-chain.
 
 ---
 

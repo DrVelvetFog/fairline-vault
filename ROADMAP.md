@@ -21,9 +21,12 @@ Where FairLine is today and the honest path to a production, multi-user vault.
 5. **Withdrawal queue** for when reserve is fully deployed (currently withdrawals are limited to idle reserve).
 
 ## Mainnet path
-**Blocked upstream:** DeepBook Predict is **testnet-only** today (the package does not exist on Sui mainnet — verified on-chain). FairLine cannot run on mainnet until Mysten ships Predict there.
+FairLine's two venues have **different** mainnet readiness:
 
-When Predict reaches mainnet, the sequence is: complete the hardening above → third-party audit → deploy the vault + strategy to mainnet → open multi-user deposits with conservative caps.
+- **CLOB-maker sleeve — mainnet-capable today.** DeepBook's core orderbook is already live on Sui mainnet, so the posture-gated maker can deploy there after the hardening above + a third-party audit, independent of anything upstream.
+- **Predict-house sleeve — upstream-gated.** DeepBook Predict is **testnet-only** today (the package does not exist on Sui mainnet — verified on-chain). The house sleeve cannot run on mainnet until Mysten ships Predict there.
+
+So the mainnet path is *partial-ready, not blocked*. Sequence: complete the hardening above → third-party audit → ship the CLOB-maker sleeve to mainnet under conservative caps → add the Predict-house sleeve when Predict reaches mainnet.
 
 ## Beyond
 - **Pluggable strategy brain** — the vault framework can host strategies other than LP/Predict.

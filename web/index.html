@@ -263,8 +263,8 @@ footer a{color:var(--muted)}footer a:hover{color:var(--green)}
   <h2>What this is — and isn't.</h2>
   <p class="lead">Credibility is a feature. We never overclaim.</p>
   <div class="honest">
-    <div class="hbox"><h4>Testnet</h4><p>Live on Sui testnet. DeepBook Predict isn't on mainnet yet, so neither are we — it's on the roadmap, not faked.</p></div>
-    <div class="hbox"><h4>Unaudited</h4><p>The contract passed an internal security review. The whole trust surface is <em>one number</em> — the operator's mark on deployed capital. Reserve is trustless, settlement can't claim more than was returned, every mark is timestamped on-chain. Mainnet fix: derive it from the on-chain PLP rate. No "audited" claims.</p></div>
+    <div class="hbox"><h4>Testnet</h4><p>Live on Sui testnet. The Predict-house sleeve can't go to mainnet until Mysten ships DeepBook Predict there — but the CLOB-maker sleeve targets DeepBook's core orderbook, which is <em>already</em> on mainnet. Partial-ready, not faked.</p></div>
+    <div class="hbox"><h4>Unaudited</h4><p>The contract passed an internal security review. The whole trust surface is <em>one number</em> — the operator's mark on deployed capital. Reserve is trustless, settlement can't claim more than was returned, every mark is timestamped on-chain. We tighten it with a <em>redemption-anchored settle</em> that realizes NAV to chain-enforced reserve each checkpoint. No "audited" claims.</p></div>
     <div class="hbox"><h4>Verifiable</h4><p>Every decision and transaction is on-chain. The numbers on this page come straight from the chain — check them yourself.</p></div>
   </div>
 </div></section>
