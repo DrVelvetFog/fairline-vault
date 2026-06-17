@@ -11,12 +11,24 @@
  * the maker accrues DEEP inventory and quotes asks too (inventory-skewed).
  */
 import 'dotenv/config';
+import * as fs from 'fs';
 import { getAddress, execute } from './wallet.js';
 import { getLivePosture } from './posture.js';
 import {
   buildCreateBalanceManager, buildDepositSui, buildPlaceLimitOrder, buildCancelAll,
   readMid, readBmSui, readBmDeep, readOpenOrderCount, loadBM, saveBM, POOL_NAME, MIN_DEEP,
 } from './deepbook.js';
+
+// Last-good mid: the DEEP/SUI book is thin, so `pool::mid_price` transiently
+// reverts to null whenever one side momentarily empties. Persist the last real
+// mid and quote around it rather than skipping the whole cycle (which would also
+// drop our resting bid and leave the book dead until someone else repopulates it).
+const MID_FILE = 'logs/mm-mid.json';
+const MID_STALE_MS = 60 * 60 * 1000;   // ignore a reference older than 1h
+const loadLastMid = (): number | null => {
+  try { const { mid, ts } = JSON.parse(fs.readFileSync(MID_FILE, 'utf-8')); return Date.now() - ts < MID_STALE_MS ? mid : null; } catch { return null; }
+};
+const saveLastMid = (mid: number) => { try { fs.mkdirSync('logs', { recursive: true }); fs.writeFileSync(MID_FILE, JSON.stringify({ mid, ts: Date.now() })); } catch {} };
 
 // Per-posture quoting policy (notional must clear the pool's 10-DEEP min order).
 const NOTIONAL_SUI: Record<string, number> = { GREEN: 0.40, AMBER: 0.30, RED: 0 }; // SUI per side
@@ -51,15 +63,20 @@ async function setup(amountSui: number) {
 async function quote() {
   const op = getAddress();
   const bm = bmOrThrow();
-  const [posture, mid] = await Promise.all([getLivePosture(), readMid(op)]);
-  if (mid === null) throw new Error('no mid price from pool');
+  const [posture, midNow] = await Promise.all([getLivePosture(), readMid(op)]);
+  // Quote around the live mid, or fall back to the last-good mid when the thin
+  // book momentarily has no mid — so the maker keeps both sides resting instead
+  // of going dark on a transient one-sided book.
+  const mid = midNow ?? loadLastMid();
+  if (mid === null) { console.log(`\n${POOL_NAME}: no mid and no recent reference — book empty both sides, skipping cycle.`); return; }
+  if (midNow !== null) saveLastMid(midNow);
 
   // Cancel stale quotes BEFORE reading balances — funds locked in resting
   // orders return to the manager on cancel, and quoting off the pre-cancel
   // balance makes the maker skip its own re-quote.
   await execute(buildCancelAll(bm), 30_000_000);
   const [sui, deep] = await Promise.all([readBmSui(bm, op), readBmDeep(bm, op)]);
-  console.log(`\n${POOL_NAME} mid ${mid.toFixed(8)} SUI/DEEP | posture ${posture.state} | inv: ${sui.toFixed(3)} SUI, ${deep.toFixed(3)} DEEP`);
+  console.log(`\n${POOL_NAME} mid ${mid.toFixed(8)}${midNow === null ? ' (stale ref)' : ''} SUI/DEEP | posture ${posture.state} | inv: ${sui.toFixed(3)} SUI, ${deep.toFixed(3)} DEEP`);
 
   if (posture.state === 'RED') { console.log('🔴 RED — cancelled all, sitting flat.'); return; }
 
@@ -81,13 +98,15 @@ async function quote() {
   } else {
     console.log(`  ⏭  skip bid — need ${lock.toFixed(3)} SUI, manager has ${sui.toFixed(3)}`);
   }
-  // Ask: sell DEEP — only with ≥ min inventory.
-  if (deep >= MIN_DEEP) {
-    const askQty = Math.min(deep, Math.max(MIN_DEEP, Math.round(notional / askPrice)));
+  // Ask: sell DEEP, but always retain a one-order DEEP floor so a single fill
+  // never zeroes inventory and forces the maker one-sided (the failure that left
+  // the book dead before — ask filled → 0 DEEP → bids only → no mid).
+  if (deep >= 2 * MIN_DEEP) {
+    const askQty = Math.min(deep - MIN_DEEP, Math.max(MIN_DEEP, Math.round(notional / askPrice)));
     await execute(buildPlaceLimitOrder(bm, false, askPrice, askQty, oid + 1), 40_000_000);
-    console.log(`  🟠 ASK ${askQty} DEEP @ ${askPrice.toFixed(8)}`);
+    console.log(`  🟠 ASK ${askQty} DEEP @ ${askPrice.toFixed(8)} (keeps ${MIN_DEEP} DEEP floor)`);
   } else {
-    console.log(`  ⏭  no ask — ${deep.toFixed(2)} DEEP inventory (< ${MIN_DEEP} min; bids must fill first)`);
+    console.log(`  ⏭  no ask — ${deep.toFixed(2)} DEEP inventory (< ${2 * MIN_DEEP} floor; bids must fill first)`);
   }
 }
 
