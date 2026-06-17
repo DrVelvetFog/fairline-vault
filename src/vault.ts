@@ -134,6 +134,39 @@ export function buildVaultSettle(coins: CoinStruct[], amountRaw: bigint, newDepl
   return tx;
 }
 
+/**
+ * Redemption-anchored settle (trustless NAV substitute). Redeems `redeemPlpRaw`
+ * PLP back to dUSDC through Predict and settles that EXACT dUSDC into the vault in
+ * ONE atomic PTB. Because the settled amount is the chain-enforced output of
+ * `predict::withdraw` — the operator never holds the coin — NAV cannot be
+ * inflated: the deployed value is *proved by redemption*, not asserted.
+ *
+ * Predict's PLP is fungible, so the operator's wallet may hold PLP beyond the
+ * vault's deployed capital; only `redeemPlpRaw` units are redeemed and the
+ * remainder stays in the operator wallet. `newDeployedRaw` = value still deployed
+ * after this redemption (0 ⇒ fully realized; NAV becomes 100% real reserve).
+ */
+export function buildRedemptionAnchoredSettle(
+  plpCoins: CoinStruct[], redeemPlpRaw: bigint, newDeployedRaw: bigint,
+): Transaction {
+  const tx = new Transaction();
+  if (plpCoins.length === 0) throw new Error('No PLP coins to redeem');
+  const primary = tx.object(plpCoins[0].coinObjectId);
+  if (plpCoins.length > 1) tx.mergeCoins(primary, plpCoins.slice(1).map(c => tx.object(c.coinObjectId)));
+  const [toRedeem] = tx.splitCoins(primary, [tx.pure.u64(redeemPlpRaw)]);  // remainder (operator-own PLP) untouched
+  const dusdc = tx.moveCall({
+    target: `${PREDICT_PACKAGE}::predict::withdraw`,
+    typeArguments: [DUSDC_TYPE],
+    arguments: [tx.object(PREDICT_OBJECT), toRedeem, tx.object(CLOCK)],
+  });
+  tx.moveCall({
+    target: `${MOD}::settle`,
+    typeArguments: [DUSDC_TYPE],
+    arguments: [tx.object(VAULT_ADMIN_CAP), tx.object(VAULT_OBJECT), dusdc, tx.pure.u64(newDeployedRaw), tx.object(CLOCK)],
+  });
+  return tx;
+}
+
 /** Operator: mark-to-market the deployed value (no cash move; runs waterfall + stamps time). */
 export function buildVaultMark(newDeployedRaw: bigint): Transaction {
   const tx = new Transaction();
