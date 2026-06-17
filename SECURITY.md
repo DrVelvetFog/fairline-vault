@@ -43,6 +43,24 @@ since Predict is testnet-only today. **Plan:** implement full vault-held-PLP cus
 at the Predict-mainnet milestone. Until then, the residual is bounded by the pause,
 the reserve floor, redemption-anchored settle, and operator-key hardening below.
 
+## H2 — mark-timing (bounded residual)
+
+Tranche P&L is allocated only on `mark`/`settle`, so between marks the share price
+is slightly stale and a depositor could in theory time a mark (enter before a
+profit mark, or exit before a loss mark). The textbook fix — re-pricing to fresh
+NAV on every deposit/withdraw — **is not implementable on-chain here:** the
+contract can't compute current NAV (it can't read Predict's deployed value, the
+same upstream gap as C1), and a `Clock` parameter can't be added to the existing
+`deposit_*` signatures without breaking Sui upgrade compatibility. It is mitigated
+to the point of being economically negligible, and fully resolves with C1:
+- The keeper marks every **~10 min** (each engine cycle, when material), so the
+  stale window is small; on a ~0.3%/day house edge the capturable drift per window
+  is ~0.002%.
+- The **redemption-anchored settle** grounds NAV in a real on-chain redemption,
+  neutralizing the asymmetric "exit before a loss mark" case.
+- Full mark-on-interaction lands with the C1 vault-held-PLP rework at Predict
+  mainnet, where the contract can realize NAV atomically inside deposit/withdraw.
+
 ## Operator key-hardening runbook (H1 — do before any real value)
 
 Today a single hot Ed25519 key (`WALLET_PRIVATE_KEY`) holds the `AdminCap`,
