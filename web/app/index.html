@@ -432,6 +432,8 @@ $('depBtn').onclick=async()=>{
   if(!account)return;
   const amt=parseFloat($('depAmt').value);
   if(!(amt>0))return status($('depStatus'),'err','Enter an amount.');
+  const nav=reserve+deployed, room=Math.max(0,CAP-nav);
+  if(amt>room)return status($('depStatus'),'err',`Vault is capacity-capped at ${fmt(CAP,0)} dUSDC (${fmt(nav,2)} in use) — only ${fmt(room,2)} dUSDC of room left. This protects depositor yield from dilution. Try ${fmt(room,2)} or less.`);
   const raw=BigInt(Math.round(amt*SCALE));
   status($('depStatus'),'info','Building transaction… approve it in your wallet.');
   try{
