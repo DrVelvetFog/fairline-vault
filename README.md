@@ -60,7 +60,7 @@ Every 60 seconds, the autonomous watcher:
 4. **Supplies liquidity** toward target on-chain via `predict::supply` (sourced atomically from the PredictManager balance), and a separate engine deploys the multi-user vault's reserve the same way.
 5. **Shows** everything on a one-screen dashboard: posture, tranches, fair-NAV drift, capacity, flywheel, and the DeepBook CLOB maker.
 
-> The original *directional* betting sleeve is **retired** (`SLEEVE_ENABLED=false`) — live results proved the spread structurally beats direction-taking, so the ML signal now feeds the defensive gate only. Its honest −749 dUSDC record is kept below as the pivot proof.
+> The original *directional* betting sleeve is **retired** (`SLEEVE_ENABLED=false`) — live results proved the spread structurally beats direction-taking, so the ML signal now feeds the defensive gate only. Its honest −830 dUSDC record is kept below as the pivot proof.
 
 ---
 
@@ -78,7 +78,7 @@ DeepBook Predict's vault is the counterparty (the house) to every binary-option 
 
 The open liability being ~0.09% of reserves is *why* FairLine uses **sticky liquidity** (it scales position size by risk rather than force-exiting) — a data-driven design choice, not an assumption.
 
-**The honest counterpoint:** FairLine began as a *directional* ML vault. Live on testnet it lost money (41.3% win rate vs ~51.5% break-even, −749 dUSDC) — the 2% spread is wider than a 63%-accurate directional model's edge. Those losses flowed into the PLP pool. So we re-weighted from the losing player to the winning house, and repurposed the ML model as a defensive risk gate. The directional sleeve has since been fully retired — the signal defends, it doesn't bet.
+**The honest counterpoint:** FairLine began as a *directional* ML vault. Live on testnet it lost money (41.3% win rate vs ~51.5% break-even, −830 dUSDC) — the 2% spread is wider than a 63%-accurate directional model's edge. Those losses flowed into the PLP pool. So we re-weighted from the losing player to the winning house, and repurposed the ML model as a defensive risk gate. The directional sleeve has since been fully retired — the signal defends, it doesn't bet.
 
 ---
 
@@ -210,7 +210,7 @@ contracts/fairline_vault/sources/
 ├── vault.move         # Tranched NAV share vault + waterfall + capacity cap
 ├── flp_s.move         # Senior share token (FLP-S)
 ├── flp_j.move         # Junior share token (FLP-J)
-└── rewards.move       # House-flywheel reward pool (+ 6 unit tests across the package)
+└── rewards.move       # House-flywheel reward pool (+ 7 unit tests across the package)
 ```
 
 ---

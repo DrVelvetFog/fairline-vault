@@ -35,7 +35,7 @@ We did not start here, and the pivot is the most important thing we learned.
 
 FairLine began as an ML-driven **directional** vault. In backtest it looked
 strong. **Live on testnet it lost money**: a 41.3% win rate against ~51.5%
-break-even, −749 dUSDC realized. The model was ~63% accurate at *direction* on
+break-even, −830 dUSDC realized. The model was ~63% accurate at *direction* on
 cross-validation, yet still lost — the 2% spread is wider than the edge.
 
 That result is the thesis, not a footnote. We asked *where did the money go?* —
@@ -81,7 +81,7 @@ deposit dUSDC into a tranche → receive FLP-S/FLP-J → withdraw pro-rata, any 
 
 A tranched, NAV-based share vault (`fairline_vault`) — `vault.move` +
 `flp_s.move` / `flp_j.move` (tranche tokens) + `rewards.move` (flywheel pool),
-**6 passing unit tests** across the package, two clean package upgrades
+**7 passing unit tests** across the package, two clean package upgrades
 (capacity, then rewards). Composes atomically with Predict (one PTB:
 `vault.deploy` → `predict.supply`). Mark/settle run the senior/junior waterfall
 and stamp `marked_at` so freshness is provable on-chain.

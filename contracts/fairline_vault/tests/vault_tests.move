@@ -152,6 +152,82 @@ fun junior_absorbs_loss_then_wipes() {
     sc.end();
 }
 
+// Losses elsewhere are marked-to-market (no cash). Here we realize them through
+// `settle` — the path the redemption-anchored mark uses — and then *withdraw* to
+// prove the haircut is real money, not just an accounting entry: junior's loss
+// reduces its payout, senior stays whole until junior is gone, then senior's
+// residual loss reduces its payout too.
+#[test]
+fun settle_realized_loss_is_withdrawable() {
+    let mut sc = ts::begin(OP);
+    let clk = clock::create_for_testing(sc.ctx());
+    bootstrap(&mut sc, &clk);
+
+    // Senior 1000 + junior 1000, all deployed.
+    sc.next_tx(ALICE);
+    { let mut v = sc.take_shared<Vault<SUI>>(); let s = vault::deposit_senior(&mut v, coin::mint_for_testing<SUI>(1000, sc.ctx()), sc.ctx()); transfer::public_transfer(s, ALICE); ts::return_shared(v); };
+    sc.next_tx(BOB);
+    { let mut v = sc.take_shared<Vault<SUI>>(); let j = vault::deposit_junior(&mut v, coin::mint_for_testing<SUI>(1000, sc.ctx()), sc.ctx()); transfer::public_transfer(j, BOB); ts::return_shared(v); };
+    sc.next_tx(OP);
+    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy(&cap, &mut v, 2000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
+
+    // Settle back only 1700 of the 2000 deployed (realized loss 300), all reserve.
+    // Junior absorbs the whole 300; senior protected.
+    sc.next_tx(OP);
+    {
+        let cap = sc.take_from_sender<AdminCap>();
+        let mut v = sc.take_shared<Vault<SUI>>();
+        vault::settle(&cap, &mut v, coin::mint_for_testing<SUI>(1700, sc.ctx()), 0, &clk);
+        assert!(vault::nav(&v) == 1700, 0);
+        assert!(vault::senior_value(&v) == 1000, 1);   // protected
+        assert!(vault::junior_value(&v) == 700, 2);    // took the 300 hit
+        ts::return_shared(v);
+        sc.return_to_sender(cap);
+    };
+
+    // Junior withdraws all → receives 700, the haircut amount (not its 1000 principal).
+    sc.next_tx(BOB);
+    {
+        let mut v = sc.take_shared<Vault<SUI>>();
+        let j = sc.take_from_sender<Coin<FLP_J>>();
+        let out = vault::withdraw_junior(&mut v, j, sc.ctx());
+        assert!(coin::value(&out) == 700, 3);
+        transfer::public_transfer(out, BOB);
+        ts::return_shared(v);
+    };
+
+    // Now redeploy senior's remaining 1000 and realize a catastrophic loss: settle
+    // back 600. Junior is already gone, so senior takes the residual haircut to 600.
+    sc.next_tx(OP);
+    { let cap = sc.take_from_sender<AdminCap>(); let mut v = sc.take_shared<Vault<SUI>>(); let d = vault::deploy(&cap, &mut v, 1000, sc.ctx()); transfer::public_transfer(d, OP); ts::return_shared(v); sc.return_to_sender(cap); };
+    sc.next_tx(OP);
+    {
+        let cap = sc.take_from_sender<AdminCap>();
+        let mut v = sc.take_shared<Vault<SUI>>();
+        vault::settle(&cap, &mut v, coin::mint_for_testing<SUI>(600, sc.ctx()), 0, &clk);
+        assert!(vault::nav(&v) == 600, 4);
+        assert!(vault::senior_value(&v) == 600, 5);    // senior haircut once junior is wiped
+        assert!(vault::junior_value(&v) == 0, 6);
+        ts::return_shared(v);
+        sc.return_to_sender(cap);
+    };
+
+    // Senior withdraws all → receives 600, the haircut amount (not its 1000 principal).
+    sc.next_tx(ALICE);
+    {
+        let mut v = sc.take_shared<Vault<SUI>>();
+        let s = sc.take_from_sender<Coin<FLP_S>>();
+        let out = vault::withdraw_senior(&mut v, s, sc.ctx());
+        assert!(coin::value(&out) == 600, 7);
+        assert!(vault::nav(&v) == 0, 8);
+        transfer::public_transfer(out, ALICE);
+        ts::return_shared(v);
+    };
+
+    clock::destroy_for_testing(clk);
+    sc.end();
+}
+
 #[test, expected_failure(abort_code = fairline_vault::vault::ECapacityFull)]
 fun deposit_over_capacity_aborts() {
     let mut sc = ts::begin(OP);
