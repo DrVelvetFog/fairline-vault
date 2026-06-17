@@ -173,9 +173,10 @@ h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:ce
 </div>
 
 <script type="module">
-import { SuiClient } from 'https://esm.sh/@mysten/sui@1.18.0/client';
-import { Transaction } from 'https://esm.sh/@mysten/sui@1.18.0/transactions';
-import { getWallets } from 'https://esm.sh/@mysten/wallet-standard@0.13.0';
+// Self-hosted, same-origin SDK bundle (@mysten/sui 1.18.0 + wallet-standard
+// 0.13.0, esbuild-bundled) — no third-party CDN in the signing path, so a
+// poisoned CDN can't inject a wallet-drainer. Rebuild: see scripts/build-dapp-sdk.sh
+import { SuiClient, Transaction, getWallets } from './vendor/sui-sdk.js';
 
 const RPC='https://fullnode.testnet.sui.io:443';
 // PKG = upgraded package id (function calls) · PKG_TYPES = original publish id (FLP-S/J + event types)

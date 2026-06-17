@@ -18,6 +18,11 @@ const DUSDC = '0xe95040085976bfd54a1a07225cd46c8a2b4e8e2b6732f140a0fc49850ba73e1
 const DRIP_DUSDC = 10_000_000n;   // 10 dUSDC (1e6 scale)
 const DRIP_SUI = 50_000_000n;     // 0.05 SUI (1e9 scale) — enough gas to deposit & withdraw
 const ALREADY_FUNDED_DUSDC = 5_000_000n;
+// Global daily cap: the per-address check is bypassable with fresh addresses, so
+// also bound total drips/24h from the faucet's own on-chain send history. Caps
+// the worst-case daily drain (e.g. a Sybil drain right before judging).
+const MAX_DRIPS_PER_DAY = 25;     // ≤ 250 dUSDC + 1.25 SUI / day
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -43,6 +48,17 @@ export default async (req: Request) => {
     return json(409, { error: 'address already has test dUSDC — go deposit it!' });
   if (BigInt(mine.totalBalance) < DRIP_DUSDC)
     return json(503, { error: 'faucet is dry — ping the team' });
+
+  // Global daily-cap check: count the faucet's own sends in the last 24h.
+  const recent = await client.queryTransactionBlocks({
+    filter: { FromAddress: faucet },
+    options: { showEffects: true },
+    limit: 50, order: 'descending',
+  });
+  const dayAgo = Date.now() - DAY_MS;
+  const dripsToday = recent.data.filter(t => Number(t.timestampMs ?? 0) >= dayAgo).length;
+  if (dripsToday >= MAX_DRIPS_PER_DAY)
+    return json(429, { error: 'faucet daily limit reached — try again tomorrow' });
 
   const coins = (await client.getCoins({ owner: faucet, coinType: DUSDC })).data;
   const tx = new Transaction();
