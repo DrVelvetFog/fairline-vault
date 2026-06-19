@@ -210,7 +210,7 @@ contracts/fairline_vault/sources/
 ├── vault.move         # Tranched NAV share vault + waterfall + capacity cap
 ├── flp_s.move         # Senior share token (FLP-S)
 ├── flp_j.move         # Junior share token (FLP-J)
-└── rewards.move       # House-flywheel reward pool (+ 7 unit tests across the package)
+└── rewards.move       # House-flywheel reward pool (+ 11 unit tests across the package)
 ```
 
 ---
